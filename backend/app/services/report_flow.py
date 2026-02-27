@@ -18,13 +18,36 @@ from app.services.workspace import (
 )
 
 
+def _normalize_deps(report_data: dict) -> dict:
+    """Normalize deps to structured format. Backward compat for flat deps."""
+    direct = report_data.get("direct_dependencies")
+    installed = report_data.get("installed_dependencies")
+    transitive = report_data.get("transitive_dependencies")
+    if direct is not None or installed is not None:
+        return {
+            "direct_dependencies": direct or {},
+            "installed_dependencies": installed or {},
+            "transitive_dependencies": transitive or {},
+        }
+    flat = report_data.get("deps") or {}
+    return {
+        "direct_dependencies": flat,
+        "installed_dependencies": flat,
+        "transitive_dependencies": {},
+    }
+
+
 def _report_to_dict(report: Report) -> dict:
     """Convert Report model to dict for drift engine."""
+    deps = report.deps or {}
     return {
         "os": report.os,
         "runtime": {"python_version": report.python_version} if report.python_version else {},
         "python_version": report.python_version,
-        "deps": report.deps or {},
+        "deps": deps.get("installed_dependencies") or deps.get("deps") or deps,
+        "direct_dependencies": deps.get("direct_dependencies"),
+        "installed_dependencies": deps.get("installed_dependencies"),
+        "transitive_dependencies": deps.get("transitive_dependencies"),
         "env_vars": report.env_vars or {},
         "db_schema_hash": report.db_schema_hash,
     }
@@ -90,11 +113,13 @@ async def process_report_upload(
             or report_data["runtime"].get("python")
         )
 
+    deps = _normalize_deps(report_data)
+
     report = Report(
         env_id=env.id,
         os=report_data.get("os"),
         python_version=python_version,
-        deps=report_data.get("deps") or {},
+        deps=deps,
         env_vars=report_data.get("env_vars") or {},
         db_schema_hash=report_data.get("db_schema_hash"),
     )
@@ -163,6 +188,7 @@ async def process_report_upload(
                 "key": d.key,
                 "value_a": d.value_a,
                 "value_b": d.value_b,
+                "details": d.details,
             })
         await db.flush()
 

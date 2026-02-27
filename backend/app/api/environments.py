@@ -21,15 +21,19 @@ async def list_environments(
     db: AsyncSession = Depends(get_db),
     workspace_id: str | None = Query(None, description="Filter by workspace"),
 ) -> list[dict]:
-    """List user's environments with last report timestamp."""
+    """List user's environments with last report timestamp and health score."""
     user_uuid = UUID(user_id)
     subq = (
         select(Report.env_id, func.max(Report.timestamp).label("last_ts"))
         .group_by(Report.env_id)
     ).subquery()
     q = (
-        select(Environment, subq.c.last_ts)
+        select(Environment, subq.c.last_ts, Report.health_score)
         .outerjoin(subq, Environment.id == subq.c.env_id)
+        .outerjoin(
+            Report,
+            (Report.env_id == subq.c.env_id) & (Report.timestamp == subq.c.last_ts),
+        )
         .where(
             or_(
                 Environment.user_id == user_uuid,
@@ -46,17 +50,22 @@ async def list_environments(
         q = q.where(Environment.workspace_id == UUID(workspace_id))
     result = await db.execute(q)
     rows = result.all()
-    return [
-        {
+    seen = set()
+    out = []
+    for env, env_ts, health in rows:
+        if env.id in seen:
+            continue
+        seen.add(env.id)
+        out.append({
             "id": str(env.id),
             "name": env.name,
             "type": env.type,
             "workspace_id": str(env.workspace_id) if env.workspace_id else None,
             "is_baseline": env.is_baseline,
             "last_report": iso_utc(env_ts) if env_ts else None,
-        }
-        for env, env_ts in rows
-    ]
+            "health_score": int(health) if health is not None else None,
+        })
+    return out
 
 
 @router.post("/{env_id}/set-baseline")

@@ -8,6 +8,9 @@ class ReportCreate(BaseModel):
     os: dict | None = None
     runtime: dict | None = None
     deps: dict = {}
+    direct_dependencies: dict | None = None
+    installed_dependencies: dict | None = None
+    transitive_dependencies: dict | None = None
     env_vars: dict = {}
     db_schema_hash: str | None = None
 

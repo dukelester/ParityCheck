@@ -8,12 +8,25 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import get_current_user_and_workspace, get_current_user_id
 from app.core.utils import iso_utc
-from app.db.models import Environment, Report, WorkspaceMember
+from app.db.models import Drift, Environment, Report, WorkspaceMember
 from app.db.session import get_db
 from app.schemas.report import ReportCreate, ReportResponse
 from app.services.report_flow import process_report_upload
 
 router = APIRouter()
+
+
+def _deps_count(deps: dict | None) -> int:
+    """Count packages in deps (handles structured or flat format)."""
+    if not deps:
+        return 0
+    if isinstance(deps.get("installed_dependencies"), dict):
+        return len(deps["installed_dependencies"])
+    if isinstance(deps, dict) and not any(
+        k in deps for k in ("direct_dependencies", "installed_dependencies", "transitive_dependencies")
+    ):
+        return len(deps)
+    return len(deps.get("installed_dependencies") or deps.get("deps") or {})
 
 
 def _format_os_summary(os_data: dict | None) -> str | None:
@@ -46,6 +59,9 @@ async def create_report(
         "os": payload.os,
         "runtime": payload.runtime,
         "deps": payload.deps or {},
+        "direct_dependencies": payload.direct_dependencies,
+        "installed_dependencies": payload.installed_dependencies,
+        "transitive_dependencies": payload.transitive_dependencies,
         "env_vars": payload.env_vars or {},
         "db_schema_hash": payload.db_schema_hash,
     }
@@ -82,13 +98,17 @@ async def get_baseline_report(
     report = await get_latest_baseline_report(db, ws_id)
     if not report:
         return None
+    deps = report.deps or {}
     return {
         "id": str(report.id),
         "env": report.environment.name,
         "timestamp": iso_utc(report.timestamp),
         "os": report.os,
         "python_version": report.python_version,
-        "deps": report.deps or {},
+        "deps": deps.get("installed_dependencies") or deps.get("deps") or deps,
+        "direct_dependencies": deps.get("direct_dependencies"),
+        "installed_dependencies": deps.get("installed_dependencies"),
+        "transitive_dependencies": deps.get("transitive_dependencies"),
         "env_vars": report.env_vars or {},
         "db_schema_hash": report.db_schema_hash,
     }
@@ -141,7 +161,7 @@ async def list_reports(
             "summary": {
                 "os": _format_os_summary(r.os),
                 "python_version": r.python_version,
-                "deps_count": len(r.deps) if r.deps else 0,
+                "deps_count": _deps_count(r.deps),
                 "env_vars_count": len(r.env_vars) if r.env_vars else 0,
                 "db_schema_hash": r.db_schema_hash,
             },
@@ -181,6 +201,34 @@ async def get_report(
     report = result.scalar_one_or_none()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
+
+    # Backfill health_score for old reports that have null
+    if report.health_score is None:
+        from app.services.workspace import get_latest_baseline_report
+
+        ws_id = report.environment.workspace_id
+        if ws_id:
+            baseline = await get_latest_baseline_report(db, ws_id)
+            if baseline and baseline.env_id != report.env_id:
+                from app.services.drift_engine import compare_reports
+                from app.services.report_flow import _report_to_dict
+
+                drift_result = compare_reports(
+                    _report_to_dict(baseline),
+                    _report_to_dict(report),
+                )
+                report.health_score = drift_result.health_score
+            else:
+                report.health_score = 100
+        else:
+            report.health_score = 100
+        await db.flush()
+
+    drift_result = await db.execute(
+        select(Drift).where(Drift.report_id == report.id).order_by(Drift.created_at.desc())
+    )
+    drifts = drift_result.scalars().all()
+
     return {
         "id": str(report.id),
         "env": report.environment.name,
@@ -191,4 +239,22 @@ async def get_report(
         "deps": report.deps,
         "env_vars": report.env_vars,
         "db_schema_hash": report.db_schema_hash,
+        "drifts": [
+            {
+                "id": str(d.id),
+                "type": d.type,
+                "severity": d.severity,
+                "key": d.key,
+                "value_a": d.value_a,
+                "value_b": d.value_b,
+                "details": d.details or {},
+            }
+            for d in drifts
+        ],
+        "summary": {
+            "critical": sum(1 for d in drifts if d.severity == "critical"),
+            "high": sum(1 for d in drifts if d.severity == "high"),
+            "medium": sum(1 for d in drifts if d.severity == "medium"),
+            "low": sum(1 for d in drifts if d.severity == "low"),
+        },
     }
