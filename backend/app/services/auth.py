@@ -4,8 +4,8 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
+import bcrypt
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,15 +13,15 @@ from app.core.config import settings
 from app.db.models import ApiKey, User
 from app.services.email import send_verification_email
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    # bcrypt has a 72-byte limit; encode and truncate if needed
+    pwd_bytes = password.encode("utf-8")[:72]
+    return bcrypt.hashpw(pwd_bytes, bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
 
 
 def create_access_token(user_id: str, email: str) -> str:
@@ -48,7 +48,8 @@ def generate_verification_token() -> str:
 
 
 def verification_token_expires_at() -> datetime:
-    return datetime.now(timezone.utc) + timedelta(hours=settings.EMAIL_VERIFICATION_EXPIRE_HOURS)
+    # Return naive UTC for TIMESTAMP WITHOUT TIME ZONE columns (asyncpg compatibility)
+    return (datetime.now(timezone.utc) + timedelta(hours=settings.EMAIL_VERIFICATION_EXPIRE_HOURS)).replace(tzinfo=None)
 
 
 def generate_api_key() -> str:
@@ -93,10 +94,11 @@ async def get_user_by_id(db: AsyncSession, user_id: UUID) -> User | None:
 
 
 async def verify_email_token(db: AsyncSession, token: str) -> User | None:
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     result = await db.execute(
         select(User).where(
             User.verification_token == token,
-            User.verification_token_expires > datetime.now(timezone.utc),
+            User.verification_token_expires > now_utc,
         )
     )
     user = result.scalar_one_or_none()
@@ -111,7 +113,7 @@ async def get_user_by_api_key(db: AsyncSession, key: str) -> User | None:
     result = await db.execute(
         select(User)
         .join(ApiKey, ApiKey.user_id == User.id)
-        .where(ApiKey.key == key, (ApiKey.expires_at.is_(None)) | (ApiKey.expires_at > datetime.now(timezone.utc)))
+        .where(ApiKey.key == key, (ApiKey.expires_at.is_(None)) | (ApiKey.expires_at > datetime.now(timezone.utc).replace(tzinfo=None)))
     )
     return result.scalar_one_or_none()
 

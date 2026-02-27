@@ -18,10 +18,11 @@ class User(Base):
     id: Mapped[UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    hashed_password: Mapped[str | None] = mapped_column(String(255), nullable=True)  # None for OAuth-only users
+    github_id: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True, index=True)
     role: Mapped[str] = mapped_column(String(50), default="user")
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
-    verification_token: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    verification_token: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     verification_token_expires: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 

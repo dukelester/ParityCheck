@@ -28,5 +28,11 @@ class Settings(BaseSettings):
     EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
     DEV_SKIP_EMAIL: bool = False  # When True, log verification links instead of sending
 
+    # GitHub OAuth
+    GITHUB_CLIENT_ID: str = ""
+    GITHUB_CLIENT_SECRET: str = ""
+    GITHUB_CALLBACK_PATH: str = "/api/v1/auth/github/callback"
+    BACKEND_URL: str = "http://localhost:8000"  # Used for OAuth redirect_uri
+
 
 settings = Settings()

@@ -3,6 +3,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import RedirectResponse
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +34,15 @@ from app.services.auth import (
     verify_password,
 )
 from app.services.email import send_verification_email
+from app.services.github_oauth import (
+    exchange_code_for_token,
+    fetch_github_primary_email,
+    fetch_github_user,
+    generate_oauth_state,
+    get_github_auth_url,
+    get_or_create_github_user,
+    verify_oauth_state,
+)
 
 router = APIRouter()
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
@@ -52,8 +62,18 @@ async def register(
             detail="Email already registered",
         )
 
-    user, _ = await create_user(db, payload.email, payload.password, payload.name)
-    await db.commit()
+    try:
+        user, _ = await create_user(db, payload.email, payload.password, payload.name)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception("Registration failed: %s", e)
+        detail = "Registration failed. Please try again."
+        if "smtp" in str(e).lower() or "email" in str(e).lower() or "auth" in str(e).lower():
+            detail = "Could not send verification email. Check SMTP settings (Gmail: use App Password, enable 2FA)."
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=detail,
+        ) from e
 
     return UserResponse(
         id=str(user.id),
@@ -71,7 +91,7 @@ async def login(
 ):
     """Login with email and password. Returns JWT tokens."""
     user = await get_user_by_email(db, payload.email)
-    if not user or not verify_password(payload.password, user.hashed_password):
+    if not user or not user.hashed_password or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
@@ -126,15 +146,102 @@ async def resend_verification(
             detail="Email already verified",
         )
 
-    from app.services.auth import generate_verification_token, verification_token_expires_at
+    from app.services.auth import (
+    generate_verification_token,
+    verification_token_expires_at,
+)
 
     user.verification_token = generate_verification_token()
     user.verification_token_expires = verification_token_expires_at()
     await db.flush()
-    await send_verification_email(user.email, user.verification_token, user.name)
+    try:
+        await send_verification_email(user.email, user.verification_token, user.name)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception("Resend verification failed: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Could not send email. Check SMTP configuration.",
+        ) from e
     await db.commit()
 
     return {"message": "If the email exists, a verification link was sent"}
+
+
+@router.get("/github")
+async def github_login():
+    """Redirect to GitHub OAuth."""
+    if not settings.GITHUB_CLIENT_ID or not settings.GITHUB_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="GitHub login is not configured",
+        )
+    state = generate_oauth_state()
+    url = get_github_auth_url(state)
+    return RedirectResponse(url=url)
+
+
+@router.get("/github/callback")
+async def github_callback(
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Handle GitHub OAuth callback. Redirects to frontend with tokens in fragment."""
+    if error:
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/login?error=oauth_denied",
+            status_code=302,
+        )
+
+    if not code or not state:
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/login?error=oauth_invalid",
+            status_code=302,
+        )
+
+    if not verify_oauth_state(state):
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/login?error=oauth_denied",
+            status_code=302,
+        )
+
+    token = await exchange_code_for_token(code)
+    if not token:
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/login?error=oauth_failed",
+            status_code=302,
+        )
+
+    gh_user = await fetch_github_user(token)
+    if not gh_user:
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/login?error=oauth_failed",
+            status_code=302,
+        )
+
+    email = gh_user.get("email")
+    if not email:
+        email = await fetch_github_primary_email(token)
+    if not email:
+        return RedirectResponse(
+            url=f"{settings.FRONTEND_URL}/login?error=oauth_no_email",
+            status_code=302,
+        )
+
+    github_id = str(gh_user["id"])
+    name = gh_user.get("name") or gh_user.get("login") or "User"
+
+    user = await get_or_create_github_user(db, github_id, email, name)
+    await db.commit()
+
+    access = create_access_token(str(user.id), user.email)
+    refresh = create_refresh_token(str(user.id))
+
+    # Redirect to frontend with tokens in fragment (not sent to server)
+    redirect_url = f"{settings.FRONTEND_URL}/auth/callback#access_token={access}&refresh_token={refresh}&expires_in={settings.JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60}"
+    return RedirectResponse(url=redirect_url, status_code=302)
 
 
 @router.post("/refresh", response_model=TokenResponse)
