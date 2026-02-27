@@ -15,6 +15,7 @@ class ReportCreate(BaseModel):
     db_schema_hash: str | None = None
     docker: dict | None = None
     k8s: dict | None = None
+    required_by: dict | None = None
 
 
 class ReportResponse(BaseModel):

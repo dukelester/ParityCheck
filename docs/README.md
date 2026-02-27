@@ -7,6 +7,7 @@ Environment drift detection for dev, staging, and production.
 ## Table of Contents
 
 - [Overview](#overview)
+- [Drift Timeline & Root Cause](#drift-timeline--root-cause)
 - [CLI Reference](#cli-reference)
 - [Dashboard](#dashboard)
 - [API](#api)
@@ -36,6 +37,15 @@ The **envguard** CLI collects metadata from your environments and uploads it to 
 | **DB schema** | Hash of database schema (when configured) |
 | **Docker** | Image tag, digest, base image, container OS (with `--docker`) |
 | **Kubernetes** | Deployments, ConfigMaps, Secrets (with `--k8s`) |
+
+### Drift Timeline & Root Cause
+
+When drift appears, the dashboard shows:
+
+- **When it started** — Timestamp of the report that first showed the drift
+- **Which report introduced it** — The report (deploy) that triggered the drift
+- **Which dependency caused transitive change** — For transitive drifts, the direct dependency that pulled in the change (requires `pip install pipdeptree` or `pip install envguard[root-cause]`)
+- **Which deploy likely triggered it** — Same as report timestamp
 
 ---
 

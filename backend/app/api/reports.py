@@ -67,6 +67,7 @@ async def create_report(
         "db_schema_hash": payload.db_schema_hash,
         "docker": payload.docker,
         "k8s": payload.k8s,
+        "required_by": payload.required_by,
     }
 
     report, _ = await process_report_upload(
@@ -396,6 +397,8 @@ async def get_report(
                 "value_a": d.value_a,
                 "value_b": d.value_b,
                 "details": d.details or {},
+                "introduced_at": iso_utc(report.timestamp),
+                "introduced_by_report_id": str(report.id),
             }
             for d in drifts
         ],

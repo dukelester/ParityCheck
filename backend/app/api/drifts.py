@@ -63,6 +63,8 @@ async def list_drifts(
             "value_b": d.value_b,
             "details": d.details or {},
             "created_at": iso_utc(d.created_at),
+            "introduced_at": iso_utc(r.timestamp),
+            "introduced_by_report_id": str(r.id),
         }
         for d, r, e in rows
     ]

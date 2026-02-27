@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useWorkspace } from '../contexts/WorkspaceContext'
@@ -51,16 +52,17 @@ export function DriftTable() {
             <th className="text-left px-6 py-4 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-widest">Severity</th>
             <th className="text-left px-6 py-4 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-widest">Environment</th>
             <th className="text-left px-6 py-4 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-widest">Details</th>
+            <th className="text-left px-6 py-4 text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-widest">Root cause</th>
           </tr>
         </thead>
         <tbody>
           {loading ? (
             <tr>
-              <td colSpan={4} className="px-6 py-12 text-center text-[var(--color-text-muted)]">Loading…</td>
+              <td colSpan={5} className="px-6 py-12 text-center text-[var(--color-text-muted)]">Loading…</td>
             </tr>
           ) : drifts.length === 0 ? (
             <tr>
-              <td colSpan={4} className="px-6 py-20 text-center">
+              <td colSpan={5} className="px-6 py-20 text-center">
                 <div className="flex flex-col items-center gap-5 max-w-sm mx-auto">
                   <div className="w-16 h-16 rounded-2xl bg-[var(--color-surface)]/80 flex items-center justify-center">
                     <svg className="w-8 h-8 text-[var(--color-text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -114,6 +116,30 @@ export function DriftTable() {
                   {d.details?.reason && (
                     <span className="text-[var(--color-text-muted)] ml-1">– {d.details.reason}</span>
                   )}
+                </td>
+                <td className="px-6 py-4 text-sm text-[var(--color-text-secondary)]">
+                  <div className="space-y-1">
+                    {d.introduced_at && (
+                      <div title="When drift first appeared">
+                        Started {new Date(d.introduced_at).toLocaleString()}
+                      </div>
+                    )}
+                    {d.introduced_by_report_id && (
+                      <Link
+                        to="/dashboard"
+                        className="text-[var(--color-accent)] hover:underline"
+                        title="Report that introduced this drift"
+                      >
+                        Report {d.introduced_by_report_id.slice(0, 8)}…
+                      </Link>
+                    )}
+                    {d.details?.likely_caused_by && (
+                      <div title="Direct dependency that pulled in this transitive change">
+                        Caused by <code className="font-mono text-xs">{d.details.likely_caused_by}</code>
+                      </div>
+                    )}
+                    {!d.introduced_at && !d.details?.likely_caused_by && '—'}
+                  </div>
                 </td>
               </tr>
             ))

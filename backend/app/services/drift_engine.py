@@ -162,18 +162,45 @@ def _compare_structured_dependencies(
             _add(pkg, "medium", None, str(direct_b[pkg]), "direct", "New direct dependency")
 
     # Transitive deps (only if both have structured data)
+    required_by = (report_b.get("deps") or {}).get("required_by") or {}
     if trans_a or trans_b:
         for pkg in set(trans_a) | set(trans_b):
             if pkg in SYSTEM_PACKAGES:
                 continue
             va, vb = trans_a.get(pkg), trans_b.get(pkg)
+            likely = required_by.get(pkg)
+            details_extra = {"likely_caused_by": likely} if likely else {}
             if va is None:
-                _add(pkg, "low", None, str(vb), "transitive", "Transitive added")
+                de = DriftEntry(
+                    type="dependency",
+                    severity="low",
+                    key=pkg,
+                    value_a=None,
+                    value_b=str(vb),
+                    details={"category": "transitive", "reason": "Transitive added", **details_extra},
+                )
+                result.drifts.append(de)
             elif vb is None:
-                _add(pkg, "low", str(va), None, "transitive", "Transitive removed")
+                de = DriftEntry(
+                    type="dependency",
+                    severity="low",
+                    key=pkg,
+                    value_a=str(va),
+                    value_b=None,
+                    details={"category": "transitive", "reason": "Transitive removed", **details_extra},
+                )
+                result.drifts.append(de)
             elif str(va) != str(vb):
                 sev = _version_severity(str(va), str(vb), False)
-                _add(pkg, sev, str(va), str(vb), "transitive", "Transitive version mismatch")
+                de = DriftEntry(
+                    type="dependency",
+                    severity=sev,
+                    key=pkg,
+                    value_a=str(va),
+                    value_b=str(vb),
+                    details={"category": "transitive", "reason": "Transitive version mismatch", **details_extra},
+                )
+                result.drifts.append(de)
 
 
 def _compare_k8s(

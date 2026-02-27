@@ -23,28 +23,39 @@ def _normalize_deps(report_data: dict) -> dict:
     direct = report_data.get("direct_dependencies")
     installed = report_data.get("installed_dependencies")
     transitive = report_data.get("transitive_dependencies")
+    required_by = report_data.get("required_by") or {}
     if direct is not None or installed is not None:
-        return {
+        out = {
             "direct_dependencies": direct or {},
             "installed_dependencies": installed or {},
             "transitive_dependencies": transitive or {},
         }
+        if required_by:
+            out["required_by"] = required_by
+        return out
     flat = report_data.get("deps") or {}
-    return {
+    out = {
         "direct_dependencies": flat,
         "installed_dependencies": flat,
         "transitive_dependencies": {},
     }
+    if required_by:
+        out["required_by"] = required_by
+    return out
 
 
 def _report_to_dict(report: Report) -> dict:
     """Convert Report model to dict for drift engine."""
     deps = report.deps or {}
+    flat = deps.get("installed_dependencies") or deps.get("deps") or deps
+    deps_for_engine = dict(flat) if isinstance(flat, dict) else {}
+    if deps.get("required_by"):
+        deps_for_engine["required_by"] = deps["required_by"]
     return {
         "os": report.os,
         "runtime": {"python_version": report.python_version} if report.python_version else {},
         "python_version": report.python_version,
-        "deps": deps.get("installed_dependencies") or deps.get("deps") or deps,
+        "deps": deps_for_engine,
         "direct_dependencies": deps.get("direct_dependencies"),
         "installed_dependencies": deps.get("installed_dependencies"),
         "transitive_dependencies": deps.get("transitive_dependencies"),

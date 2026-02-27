@@ -3,6 +3,7 @@ import { CodeBlock } from './CodeBlock'
 
 const sections = [
   { id: 'overview', title: 'Overview' },
+  { id: 'drift-timeline', title: 'Drift Timeline & Root Cause' },
   { id: 'installation', title: 'Installation' },
   { id: 'quick-start', title: 'Quick Start' },
   { id: 'collect', title: 'collect' },
@@ -61,6 +62,22 @@ export function Documentation() {
               <li><strong className="text-[var(--color-text)]">Docker</strong> — Image tag, digest, base image, container OS (with <code className="font-mono text-xs bg-[var(--color-bg)] px-1.5 py-0.5 rounded">--docker</code>)</li>
               <li><strong className="text-[var(--color-text)]">Kubernetes</strong> — ConfigMaps, Secrets, Deployments (image, replicas, resources, env vars) with <code className="font-mono text-xs bg-[var(--color-bg)] px-1.5 py-0.5 rounded">--k8s</code></li>
             </ul>
+          </DocSection>
+
+          {/* Drift Timeline */}
+          <DocSection id="drift-timeline" title="Drift Timeline & Root Cause" innerRef={sectionRefs}>
+            <p className="text-[var(--color-text-secondary)]">
+              When drift appears, the dashboard shows <strong className="text-[var(--color-text)]">when it started</strong>, <strong className="text-[var(--color-text)]">which report introduced it</strong>, and for transitive dependency changes, <strong className="text-[var(--color-text)]">which direct dependency caused it</strong>.
+            </p>
+            <ul className="mt-4 space-y-2 text-[var(--color-text-secondary)]">
+              <li><strong className="text-[var(--color-text)]">When it started</strong> — Timestamp of the report that first showed the drift</li>
+              <li><strong className="text-[var(--color-text)]">Which report introduced it</strong> — Link to the report (deploy) that triggered the drift</li>
+              <li><strong className="text-[var(--color-text)]">Which dependency caused transitive change</strong> — For transitive drifts, the direct dependency that pulled in the change (requires <code className="font-mono text-xs bg-[var(--color-bg)] px-1.5 py-0.5 rounded">pip install pipdeptree</code>)</li>
+              <li><strong className="text-[var(--color-text)]">Which deploy likely triggered it</strong> — Same as report timestamp; the deploy that introduced the drift</li>
+            </ul>
+            <p className="text-[var(--color-text-secondary)] mt-4">
+              Install <code className="font-mono text-xs">pip install envguard[root-cause]</code> or <code className="font-mono text-xs">pip install pipdeptree</code> for transitive root cause attribution.
+            </p>
           </DocSection>
 
           {/* Installation */}

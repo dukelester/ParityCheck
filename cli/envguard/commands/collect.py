@@ -157,15 +157,58 @@ def _extract_version_from_constraint(constraint: str) -> str | None:
     return None
 
 
+def _get_required_by(direct: dict) -> dict[str, str]:
+    """Build transitive pkg -> direct dep map via pipdeptree. For root cause analysis."""
+    try:
+        out = subprocess.run(
+            [sys.executable, "-m", "pipdeptree", "--json"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            cwd=Path.cwd(),
+        )
+        if out.returncode != 0:
+            return {}
+        data = json.loads(out.stdout)
+    except (json.JSONDecodeError, subprocess.TimeoutExpired, FileNotFoundError):
+        return {}
+
+    child_to_parent: dict[str, str] = {}
+    for item in data:
+        parent_key = (item.get("package") or {}).get("key", "").replace("_", "-").lower()
+        for dep in item.get("dependencies") or []:
+            child_key = (dep.get("key") or dep.get("package_name") or "").replace("_", "-").lower()
+            if child_key:
+                child_to_parent[child_key] = parent_key
+
+    def _resolve_to_direct(pkg: str) -> str | None:
+        seen = set()
+        while pkg and pkg not in seen:
+            seen.add(pkg)
+            if pkg in direct:
+                return pkg
+            pkg = child_to_parent.get(pkg)
+        return None
+
+    required_by = {}
+    for child in child_to_parent:
+        if child not in direct:
+            top = _resolve_to_direct(child)
+            if top:
+                required_by[child] = top
+    return required_by
+
+
 def _get_dependencies(cwd: Path, mode: str) -> dict:
     """
     Return structured deps:
     {
       "direct_dependencies": {},
       "installed_dependencies": {},
-      "transitive_dependencies": {}
+      "transitive_dependencies": {},
+      "required_by": {},  # transitive pkg -> direct dep (for root cause)
+      "deps": {}
     }
-    Also include legacy "deps" for backward compatibility.
     """
     direct = _get_direct_dependencies(cwd)
     installed = _get_installed_dependencies(mode)
@@ -175,14 +218,18 @@ def _get_dependencies(cwd: Path, mode: str) -> dict:
         if name not in direct:
             transitive[name] = version
 
+    required_by = _get_required_by(direct)
     legacy_deps = {**direct, **transitive}
 
-    return {
+    result = {
         "direct_dependencies": direct,
         "installed_dependencies": installed,
         "transitive_dependencies": transitive,
         "deps": legacy_deps,
     }
+    if required_by:
+        result["required_by"] = required_by
+    return result
 
 
 def _get_env_vars(include_secrets: bool = False) -> dict:

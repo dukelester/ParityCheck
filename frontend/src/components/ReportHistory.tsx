@@ -259,6 +259,12 @@ function ReportDetailView({ report }: { report: ReportDetail }) {
                       )}</>
                     )}
                   </span>
+                  {(d.introduced_at || d.details?.likely_caused_by) && (
+                    <span className="text-xs text-[var(--color-text-muted)] ml-auto">
+                      {d.introduced_at && `Started ${new Date(d.introduced_at).toLocaleString()}`}
+                      {d.details?.likely_caused_by && ` · Caused by ${d.details.likely_caused_by}`}
+                    </span>
+                  )}
                 </div>
               ))}
               {directDrifts.map((d, i) => (
@@ -276,6 +282,11 @@ function ReportDetailView({ report }: { report: ReportDetail }) {
                     )}
                     {d.details?.reason && (
                       <span className="text-[var(--color-text-muted)] ml-1">– {d.details.reason}</span>
+                    )}
+                    {d.introduced_at && (
+                      <span className="text-xs text-[var(--color-text-muted)] block mt-1">
+                        Started {new Date(d.introduced_at).toLocaleString()}
+                      </span>
                     )}
                   </span>
                 </div>
@@ -306,6 +317,12 @@ function ReportDetailView({ report }: { report: ReportDetail }) {
                             )}
                             {d.details?.reason && (
                               <span className="text-[var(--color-text-muted)] ml-1">– {d.details.reason}</span>
+                            )}
+                            {(d.introduced_at || d.details?.likely_caused_by) && (
+                              <span className="text-xs text-[var(--color-text-muted)] block mt-1">
+                                {d.introduced_at && `Started ${new Date(d.introduced_at).toLocaleString()}`}
+                                {d.details?.likely_caused_by && ` · Caused by ${d.details.likely_caused_by}`}
+                              </span>
                             )}
                           </span>
                         </div>
