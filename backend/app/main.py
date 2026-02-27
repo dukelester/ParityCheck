@@ -16,7 +16,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(
+app = FastAPI( 
     title="ParityCheck API",
     description="Environment drift detection SaaS",
     version="0.1.0",

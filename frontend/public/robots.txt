@@ -1,0 +1,8 @@
+# ParityCheck / ENVGUARD - Environment Drift Detection
+# https://paritycheck.dev
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://paritycheck.dev/sitemap.xml

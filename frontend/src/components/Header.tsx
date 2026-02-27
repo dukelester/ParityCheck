@@ -1,37 +1,27 @@
-import { useNavigate } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
+import { Logo } from './Logo'
 import type { User } from '../lib/api'
 
-type Section = 'home' | 'dashboard' | 'profile' | 'docs'
-
 interface HeaderProps {
-  activeSection?: Section
-  onSectionChange?: (section: Section) => void
   user?: User | null
   loading?: boolean
   onLogout?: () => void
 }
 
-export function Header({ activeSection = 'home', onSectionChange, user, loading, onLogout }: HeaderProps) {
-  const navigate = useNavigate()
-
-  const handleSectionChange = (s: Section) => {
-    if (onSectionChange) onSectionChange(s)
-    else navigate(s === 'home' ? '/' : `/${s}`)
-  }
+export function Header({ user, loading, onLogout }: HeaderProps) {
+  const navClass = ({ isActive }: { isActive: boolean }) =>
+    `px-4 py-2.5 rounded-[var(--radius-md)] text-sm font-medium transition-all ${
+      isActive ? 'bg-[var(--color-surface)] text-[var(--color-accent)]' : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]/50'
+    }`
 
   return (
     <header className="sticky top-0 z-50 border-b border-[var(--color-border)]/50 bg-[var(--color-bg-elevated)]/80 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-6 py-3.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-10">
-            <button
-              onClick={() => handleSectionChange('home')}
-              className="flex items-center gap-3 group"
-            >
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--color-accent)] to-[var(--color-accent-muted)] flex items-center justify-center shadow-[0_0_20px_rgba(0,212,170,0.2)] group-hover:shadow-[0_0_30px_rgba(0,212,170,0.3)] transition-shadow">
-                <svg className="w-5 h-5 text-[var(--color-bg)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+            <Link to="/" className="flex items-center gap-3 group">
+              <div className="flex items-center justify-center shadow-[0_0_20px_rgba(0,212,170,0.2)] group-hover:shadow-[0_0_30px_rgba(0,212,170,0.3)] transition-shadow">
+                <Logo size={36} />
               </div>
               <div>
                 <span className="text-lg font-bold tracking-tight text-[var(--color-text)] group-hover:text-[var(--color-accent)] transition-colors">
@@ -41,25 +31,19 @@ export function Header({ activeSection = 'home', onSectionChange, user, loading,
                   ENVGUARD
                 </span>
               </div>
-            </button>
+            </Link>
             <nav className="flex items-center gap-1">
-              {[
-                { id: 'dashboard' as const, label: 'Dashboard' },
-                ...(user ? [{ id: 'profile' as const, label: 'Profile' }] : []),
-                { id: 'docs' as const, label: 'Docs' },
-              ].map(({ id, label }) => (
-                <button
-                  key={id}
-                  onClick={() => handleSectionChange(id)}
-                  className={`px-4 py-2.5 rounded-[var(--radius-md)] text-sm font-medium transition-all ${
-                    activeSection === id
-                      ? 'bg-[var(--color-surface)] text-[var(--color-accent)]'
-                      : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]/50'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+              <NavLink to="/dashboard" className={navClass}>
+                Dashboard
+              </NavLink>
+              {user && (
+                <NavLink to="/profile" className={navClass}>
+                  Profile
+                </NavLink>
+              )}
+              <NavLink to="/docs" className={navClass}>
+                Docs
+              </NavLink>
             </nav>
           </div>
           <div className="flex items-center gap-3">
@@ -75,12 +59,9 @@ export function Header({ activeSection = 'home', onSectionChange, user, loading,
             {user ? (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-[var(--color-text-secondary)] hidden md:inline truncate max-w-[160px]">{user.email}</span>
-                <button
-                  onClick={() => handleSectionChange('profile')}
-                  className="px-3 py-2 rounded-[var(--radius-md)] text-[var(--color-text-secondary)] text-sm font-medium hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]/50 transition-all hidden sm:block"
-                >
+                <NavLink to="/profile" className={({ isActive }) => `px-3 py-2 rounded-[var(--radius-md)] text-[var(--color-text-secondary)] text-sm font-medium hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]/50 transition-all hidden sm:block ${isActive ? 'text-[var(--color-accent)]' : ''}`}>
                   Account
-                </button>
+                </NavLink>
                 <button
                   onClick={onLogout}
                   className="px-4 py-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)]/70 text-[var(--color-text)] text-sm font-medium hover:bg-[var(--color-surface)] hover:border-[var(--color-border)] transition-all"
@@ -89,12 +70,12 @@ export function Header({ activeSection = 'home', onSectionChange, user, loading,
                 </button>
               </div>
             ) : !loading ? (
-              <button
-                onClick={() => navigate('/login')}
+              <Link
+                to="/login"
                 className="px-5 py-2.5 rounded-[var(--radius-md)] bg-[var(--color-accent)] text-[var(--color-bg)] text-sm font-semibold hover:bg-[var(--color-accent-hover)] transition-all shadow-[0_0_20px_rgba(0,212,170,0.2)] hover:shadow-[0_0_30px_rgba(0,212,170,0.3)]"
               >
                 Sign In
-              </button>
+              </Link>
             ) : null}
           </div>
         </div>

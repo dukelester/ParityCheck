@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { Routes, Route, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
+import { Routes, Route, useNavigate, useSearchParams, useLocation, Outlet } from 'react-router-dom'
 import { EnvironmentStatus } from './components/EnvironmentStatus'
 import { DriftTable } from './components/DriftTable'
 import { Header } from './components/Header'
+import { Footer } from './components/Footer'
 import { ProfileContent } from './components/ProfileContent'
 import { Documentation } from './components/Documentation'
 import { Landing } from './components/Landing'
@@ -21,52 +22,6 @@ function App() {
 
   const token = searchParams.get('token')
 
-  if (location.pathname === '/verify-email') {
-    return (
-      <div className="min-h-screen bg-[var(--color-bg)]">
-        {token ? (
-          <VerifyEmailPage
-            token={token}
-            onVerified={() => navigate('/login')}
-          />
-        ) : (
-          <div className="min-h-screen flex items-center justify-center">
-            <p className="text-[var(--color-text-muted)]">Invalid verification link</p>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  if (location.pathname === '/login') {
-    return (
-      <div className="min-h-screen bg-[var(--color-bg)]">
-        <Header user={user} loading={loading} onLogout={logout} />
-        <LoginPage
-          onLogin={async (email, password) => {
-            await login(email, password)
-            navigate('/dashboard')
-          }}
-          onSwitchToSignup={() => navigate('/signup')}
-        />
-      </div>
-    )
-  }
-
-  if (location.pathname === '/signup') {
-    return (
-      <div className="min-h-screen bg-[var(--color-bg)]">
-        <Header user={user} loading={loading} onLogout={logout} />
-        <SignupPage
-          onRegister={register}
-          onSwitchToLogin={() => navigate('/login')}
-        />
-      </div>
-    )
-  }
-
-  const activeSection = location.pathname === '/dashboard' ? 'dashboard' : location.pathname === '/profile' ? 'profile' : location.pathname === '/docs' ? 'docs' : 'home'
-
   useEffect(() => {
     if (loading) return
     if ((location.pathname === '/dashboard' || location.pathname === '/profile') && !user) {
@@ -75,21 +30,67 @@ function App() {
   }, [location.pathname, user, loading, navigate])
 
   return (
-    <div className="min-h-screen bg-[var(--color-bg)]">
-      <Header user={user} loading={loading} onLogout={logout} activeSection={activeSection} onSectionChange={(s) => navigate(s === 'home' ? '/' : `/${s}`)} />
-      <Routes>
-        <Route path="/" element={
-          <Landing onNavigate={(s) => navigate(s === 'dashboard' ? '/dashboard' : '/docs')} />
-        } />
-        <Route path="/dashboard" element={
+    <Routes>
+      <Route path="/verify-email" element={
+        token ? (
+          <div className="min-h-screen bg-[var(--color-bg)]">
+            <VerifyEmailPage
+              token={token}
+              onVerified={() => navigate('/login')}
+            />
+          </div>
+        ) : (
+          <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)]">
+            <p className="text-[var(--color-text-muted)]">Invalid verification link</p>
+          </div>
+        )
+      } />
+      <Route path="/login" element={
+        <div className="min-h-screen bg-[var(--color-bg)] flex flex-col">
+          <Header user={user} loading={loading} onLogout={logout} />
+          <div className="flex-1">
+            <LoginPage
+            onLogin={async (email, password) => {
+              await login(email, password)
+              navigate('/dashboard')
+            }}
+            onSwitchToSignup={() => navigate('/signup')}
+          />
+          </div>
+          <Footer />
+        </div>
+      } />
+      <Route path="/signup" element={
+        <div className="min-h-screen bg-[var(--color-bg)] flex flex-col">
+          <Header user={user} loading={loading} onLogout={logout} />
+          <div className="flex-1">
+            <SignupPage
+            onRegister={register}
+            onSwitchToLogin={() => navigate('/login')}
+          />
+          </div>
+          <Footer />
+        </div>
+      } />
+      <Route path="/" element={
+        <div className="min-h-screen bg-[var(--color-bg)] flex flex-col">
+          <Header user={user} loading={loading} onLogout={logout} />
+          <div className="flex-1">
+            <Outlet />
+          </div>
+          <Footer />
+        </div>
+      }>
+        <Route index element={<Landing />} />
+        <Route path="dashboard" element={
           user ? <DashboardContent activeTab={activeTab} setActiveTab={setActiveTab} /> : null
         } />
-        <Route path="/profile" element={
+        <Route path="profile" element={
           user ? <ProfileContent user={user} /> : null
         } />
-        <Route path="/docs" element={<Documentation />} />
-      </Routes>
-    </div>
+        <Route path="docs" element={<Documentation />} />
+      </Route>
+    </Routes>
   )
 }
 

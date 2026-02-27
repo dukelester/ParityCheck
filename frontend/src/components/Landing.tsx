@@ -1,14 +1,11 @@
+import { Link } from 'react-router-dom'
 import { CodeBlock } from './CodeBlock'
 
-interface LandingProps {
-  onNavigate: (section: 'dashboard' | 'docs') => void
-}
-
-export function Landing({ onNavigate }: LandingProps) {
+export function Landing() {
   return (
-    <>
+    <main role="main" aria-label="ParityCheck - Environment drift detection for dev, staging, and production">
       {/* Hero */}
-      <section className="relative overflow-hidden min-h-[90vh] flex items-center">
+      <section aria-labelledby="hero-heading" className="relative overflow-hidden min-h-[90vh] flex items-center">
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(0,212,170,0.15),transparent)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_40%_at_80%_50%,rgba(0,212,170,0.06),transparent)]" />
         <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,var(--color-bg)_70%)]" />
@@ -25,6 +22,7 @@ export function Landing({ onNavigate }: LandingProps) {
               <span className="text-sm font-medium text-[var(--color-text-secondary)]">Environment drift detection for modern teams</span>
             </div>
             <h1
+              id="hero-heading"
               className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-[var(--color-text)] tracking-tight leading-[1.05] animate-fade-in-up"
               style={{ animationDelay: '0.2s', animationFillMode: 'both' }}
             >
@@ -46,18 +44,18 @@ export function Landing({ onNavigate }: LandingProps) {
               className="mt-12 flex flex-wrap items-center justify-center gap-4 animate-fade-in-up"
               style={{ animationDelay: '0.4s', animationFillMode: 'both' }}
             >
-              <button
-                onClick={() => onNavigate('dashboard')}
+              <Link
+                to="/dashboard"
                 className="group px-8 py-4 rounded-[var(--radius-lg)] bg-[var(--color-accent)] text-[var(--color-bg)] font-semibold hover:bg-[var(--color-accent-hover)] transition-all duration-300 shadow-[0_0_30px_rgba(0,212,170,0.3)] hover:shadow-[0_0_40px_rgba(0,212,170,0.4)] hover:scale-[1.02] active:scale-[0.98]"
               >
                 Open Dashboard
-              </button>
-              <button
-                onClick={() => onNavigate('docs')}
+              </Link>
+              <Link
+                to="/docs"
                 className="px-8 py-4 rounded-[var(--radius-lg)] bg-[var(--color-surface)]/60 border border-[var(--color-border)] text-[var(--color-text)] font-semibold hover:bg-[var(--color-surface)] hover:border-[var(--color-accent)]/40 transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
               >
                 Read Documentation
-              </button>
+              </Link>
             </div>
             <div
               className="mt-10 flex items-center justify-center gap-8 text-sm text-[var(--color-text-muted)] animate-fade-in"
@@ -77,9 +75,9 @@ export function Landing({ onNavigate }: LandingProps) {
       </section>
 
       {/* Problem */}
-      <section className="border-t border-[var(--color-border)]/50">
+      <section aria-labelledby="problem-heading" className="border-t border-[var(--color-border)]/50">
         <div className="max-w-4xl mx-auto px-6 py-24 md:py-32">
-          <h2 className="text-3xl md:text-4xl font-bold text-[var(--color-text)] text-center mb-6">
+          <h2 id="problem-heading" className="text-3xl md:text-4xl font-bold text-[var(--color-text)] text-center mb-6">
             "It works on my machine"
           </h2>
           <p className="text-[var(--color-text-secondary)] text-center max-w-2xl mx-auto text-lg md:text-xl leading-relaxed">
@@ -89,9 +87,9 @@ export function Landing({ onNavigate }: LandingProps) {
       </section>
 
       {/* How it works */}
-      <section className="border-t border-[var(--color-border)]/50 bg-[var(--color-bg-elevated)]">
+      <section aria-labelledby="how-it-works-heading" className="border-t border-[var(--color-border)]/50 bg-[var(--color-bg-elevated)]">
         <div className="max-w-6xl mx-auto px-6 py-24 md:py-32">
-          <h2 className="text-3xl md:text-4xl font-bold text-[var(--color-text)] text-center mb-4">
+          <h2 id="how-it-works-heading" className="text-3xl md:text-4xl font-bold text-[var(--color-text)] text-center mb-4">
             How it works
           </h2>
           <p className="text-[var(--color-text-secondary)] text-center max-w-xl mx-auto mb-20 text-lg">
@@ -123,9 +121,9 @@ export function Landing({ onNavigate }: LandingProps) {
       </section>
 
       {/* Features */}
-      <section className="border-t border-[var(--color-border)]/50">
+      <section aria-labelledby="features-heading" className="border-t border-[var(--color-border)]/50">
         <div className="max-w-6xl mx-auto px-6 py-24 md:py-32">
-          <h2 className="text-3xl md:text-4xl font-bold text-[var(--color-text)] text-center mb-4">
+          <h2 id="features-heading" className="text-3xl md:text-4xl font-bold text-[var(--color-text)] text-center mb-4">
             Built for developers
           </h2>
           <p className="text-[var(--color-text-secondary)] text-center max-w-xl mx-auto mb-20 text-lg">
@@ -156,9 +154,9 @@ export function Landing({ onNavigate }: LandingProps) {
       </section>
 
       {/* Quick start */}
-      <section className="border-t border-[var(--color-border)]/50 bg-[var(--color-bg-elevated)]">
+      <section aria-labelledby="quickstart-heading" className="border-t border-[var(--color-border)]/50 bg-[var(--color-bg-elevated)]">
         <div className="max-w-3xl mx-auto px-6 py-24 md:py-32">
-          <h2 className="text-3xl md:text-4xl font-bold text-[var(--color-text)] text-center mb-4">
+          <h2 id="quickstart-heading" className="text-3xl md:text-4xl font-bold text-[var(--color-text)] text-center mb-4">
             Get started in 60 seconds
           </h2>
           <p className="text-[var(--color-text-secondary)] text-center max-w-xl mx-auto mb-12 text-lg">
@@ -184,31 +182,31 @@ envguard compare --env=prod --baseline=dev`}</CodeBlock>
       </section>
 
       {/* CTA */}
-      <section className="border-t border-[var(--color-border)]/50">
+      <section aria-labelledby="cta-heading" className="border-t border-[var(--color-border)]/50">
         <div className="max-w-3xl mx-auto px-6 py-28 md:py-36 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-[var(--color-text)] mb-4">
+          <h2 id="cta-heading" className="text-3xl md:text-4xl font-bold text-[var(--color-text)] mb-4">
             Ready to eliminate drift?
           </h2>
           <p className="text-[var(--color-text-secondary)] mb-10 text-lg">
             Sign up for free. No credit card required.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-4">
-            <button
-              onClick={() => onNavigate('dashboard')}
+            <Link
+              to="/dashboard"
               className="px-10 py-4 rounded-[var(--radius-lg)] bg-[var(--color-accent)] text-[var(--color-bg)] font-semibold hover:bg-[var(--color-accent-hover)] transition-all shadow-[0_0_30px_rgba(0,212,170,0.25)] hover:shadow-[0_0_50px_rgba(0,212,170,0.35)] hover:scale-[1.02] active:scale-[0.98]"
             >
               Get started free
-            </button>
-            <button
-              onClick={() => onNavigate('docs')}
+            </Link>
+            <Link
+              to="/docs"
               className="px-10 py-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] text-[var(--color-text)] font-semibold hover:bg-[var(--color-surface)] hover:border-[var(--color-accent)]/40 transition-all hover:scale-[1.02] active:scale-[0.98]"
             >
               View documentation
-            </button>
+            </Link>
           </div>
         </div>
       </section>
-    </>
+    </main>
   )
 }
 
