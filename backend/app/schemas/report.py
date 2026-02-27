@@ -13,6 +13,8 @@ class ReportCreate(BaseModel):
     transitive_dependencies: dict | None = None
     env_vars: dict = {}
     db_schema_hash: str | None = None
+    docker: dict | None = None
+    k8s: dict | None = None
 
 
 class ReportResponse(BaseModel):

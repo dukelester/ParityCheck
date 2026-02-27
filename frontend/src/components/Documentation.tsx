@@ -7,6 +7,8 @@ const sections = [
   { id: 'quick-start', title: 'Quick Start' },
   { id: 'collect', title: 'collect' },
   { id: 'compare', title: 'compare' },
+  { id: 'analyze', title: 'analyze' },
+  { id: 'check', title: 'check' },
   { id: 'report', title: 'report' },
   { id: 'schedule', title: 'schedule' },
   { id: 'history', title: 'history' },
@@ -49,13 +51,15 @@ export function Documentation() {
           {/* Overview */}
           <DocSection id="overview" title="Overview" innerRef={sectionRefs}>
             <p className="text-[var(--color-text-secondary)] leading-relaxed">
-              ParityCheck detects environment drift across dev, staging, and production. The <strong className="text-[var(--color-text)]">envguard</strong> CLI collects metadata from your environments and uploads it to the SaaS dashboard for comparison and alerting.
+              ParityCheck is a <strong className="text-[var(--color-text)]">Deployment Safety Engine</strong> that detects environment drift across dev, staging, and production. The <strong className="text-[var(--color-text)]">envguard</strong> CLI collects metadata, analyzes deployment risk before you deploy, and uploads reports to the SaaS dashboard for comparison and alerting.
             </p>
             <ul className="mt-4 space-y-2 text-[var(--color-text-secondary)]">
               <li><strong className="text-[var(--color-text)]">OS & runtime</strong> — System info, Python version</li>
               <li><strong className="text-[var(--color-text)]">Dependencies</strong> — pip packages and versions</li>
               <li><strong className="text-[var(--color-text)]">Environment variables</strong> — Config differences (secrets redacted by default)</li>
               <li><strong className="text-[var(--color-text)]">DB schema hash</strong> — Schema drift detection</li>
+              <li><strong className="text-[var(--color-text)]">Docker</strong> — Image tag, digest, base image, container OS (with <code className="font-mono text-xs bg-[var(--color-bg)] px-1.5 py-0.5 rounded">--docker</code>)</li>
+              <li><strong className="text-[var(--color-text)]">Kubernetes</strong> — ConfigMaps, Secrets, Deployments (image, replicas, resources, env vars) with <code className="font-mono text-xs bg-[var(--color-bg)] px-1.5 py-0.5 rounded">--k8s</code></li>
             </ul>
           </DocSection>
 
@@ -71,15 +75,19 @@ cd cli && pip install -e .`}</CodeBlock>
 
           {/* Quick Start */}
           <DocSection id="quick-start" title="Quick Start" innerRef={sectionRefs}>
-            <p className="text-[var(--color-text-secondary)]">Three steps to get started:</p>
+            <p className="text-[var(--color-text-secondary)]">Get started in a few steps:</p>
             <CodeBlock language="bash">{`# 1. Collect from dev (baseline)
 envguard collect --env=dev
 
-# 2. Collect from prod
-envguard collect --env=prod
+# 2. Collect from prod (add --docker if running in a container)
+envguard collect --env=prod --docker
 
 # 3. Compare dev vs prod
-envguard compare --env=prod --baseline=dev`}</CodeBlock>
+envguard compare --env=prod --baseline=dev
+
+# 4. Deployment risk: compare PR branch vs prod
+envguard collect --env=pr-branch
+envguard analyze --against=prod --env=pr-branch --api-key=YOUR_KEY`}</CodeBlock>
             <p className="text-[var(--color-text-secondary)] mt-4">
               To push reports to the SaaS dashboard, use <code className="font-mono text-xs bg-[var(--color-bg)] px-1.5 py-0.5 rounded">envguard report --api-key=YOUR_KEY</code>.
             </p>
@@ -95,11 +103,32 @@ envguard compare --env=prod --baseline=dev`}</CodeBlock>
 Options:
   --env, -e TEXT     Environment name (dev/staging/prod) [default: dev]
   --output, -o TEXT  Write report to file instead of cache
-  --include-secrets  Include secret env vars (default: redacted)`}</CodeBlock>
+  --include-secrets  Include secret env vars (default: redacted)
+  --docker, -d       Collect Docker metadata (image tag, digest, base, OS)
+  --container, -c    Container name/ID when running on host (use with --docker)
+  --k8s, -k          Collect Kubernetes metadata (deployments, configmaps, secrets)
+  --namespace, -n    K8s namespace [default: default]
+  --deployment       Specific deployment name (default: all in namespace)`}</CodeBlock>
             <CodeBlock language="bash">{`# Examples
 envguard collect --env=dev
 envguard collect --env=staging -o report.json
-envguard collect --env=prod --include-secrets`}</CodeBlock>
+envguard collect --env=prod --include-secrets
+
+# Inside a container: collect Docker image info for drift detection
+envguard collect --env=prod --docker
+
+# On host: inspect a specific container
+envguard collect --env=prod --docker --container=my-app
+
+# Kubernetes: ConfigMaps, Secrets, Deployments (image, replicas, resources)
+envguard collect --env=prod --k8s --namespace=prod
+envguard collect --env=staging --k8s -n staging --deployment=my-app`}</CodeBlock>
+            <p className="text-[var(--color-text-secondary)] mt-4">
+              <strong className="text-[var(--color-text)]">Docker drift</strong> — Base image changes (Alpine → Debian), Python minor version in container, and image digest drift are high-value production risks. Use <code className="font-mono text-xs bg-[var(--color-bg)] px-1.5 py-0.5 rounded">--docker</code> to detect them.
+            </p>
+            <p className="text-[var(--color-text-secondary)] mt-2">
+              <strong className="text-[var(--color-text)]">Kubernetes drift</strong> — ConfigMap mismatch, Secret mismatch, replica count, resource limits, and deployment env vars. Use <code className="font-mono text-xs bg-[var(--color-bg)] px-1.5 py-0.5 rounded">--k8s --namespace=prod</code> to detect them. Requires <code className="font-mono text-xs">kubectl</code> and cluster access.
+            </p>
           </DocSection>
 
           {/* compare */}
@@ -117,6 +146,47 @@ envguard compare --env=prod
 
 # Compare staging against prod
 envguard compare --env=staging --baseline=prod`}</CodeBlock>
+          </DocSection>
+
+          {/* analyze */}
+          <DocSection id="analyze" title="analyze" innerRef={sectionRefs}>
+            <p className="text-[var(--color-text-secondary)]">
+              <strong className="text-[var(--color-text)]">Deployment risk analysis.</strong> Compares your current environment (e.g. PR branch) against a target (e.g. prod) and outputs a deployment risk score. Use before merging or deploying to predict drift impact.
+            </p>
+            <CodeBlock language="bash">{`envguard analyze [OPTIONS]
+
+Options:
+  --against, -a TEXT    Environment to compare against [default: prod]
+  --env, -e TEXT       Current env / branch (report from collect) [default: dev]
+  --api-key, -k TEXT   [Required] API key for auth
+  --file, -F TEXT      Report file (default: use cached for --env)
+  --output, -o TEXT   Output format: text | json [default: text]
+  --fail-on-risk, -f   Exit 1 if risk score >= threshold
+  --risk-threshold, -t INT  Risk threshold for -f (0-100) [default: 50]`}</CodeBlock>
+            <CodeBlock language="bash">{`# Analyze PR branch vs prod
+envguard collect --env=pr-feature-xyz
+envguard analyze --against=prod --env=pr-feature-xyz --api-key=pc_xxxxx
+
+# JSON output for CI
+envguard analyze --against=prod --api-key=pc_xxxxx -o json
+
+# Fail CI if risk >= 30
+envguard analyze --against=prod --api-key=pc_xxxxx -f --risk-threshold=30`}</CodeBlock>
+          </DocSection>
+
+          {/* check */}
+          <DocSection id="check" title="check" innerRef={sectionRefs}>
+            <p className="text-[var(--color-text-secondary)]">
+              Compares current env with the workspace baseline from the API. Use <code className="font-mono text-xs">--fail-on-drift</code> for CI/CD to exit 1 when drift is detected.
+            </p>
+            <CodeBlock language="bash">{`envguard check [OPTIONS]
+
+Options:
+  --api-key, -k TEXT   [Required] API key
+  --env, -e TEXT       Environment to check [default: dev]
+  --fail-on-drift, -f  Exit 1 if drift severity >= min-severity
+  --min-severity, -m TEXT  critical | high | medium | low [default: high]
+  --file, -F TEXT      Report file (default: use cached)`}</CodeBlock>
           </DocSection>
 
           {/* report */}
@@ -168,8 +238,13 @@ Options:
           {/* Workflow */}
           <DocSection id="workflow" title="Workflow & CI" innerRef={sectionRefs}>
             <p className="text-[var(--color-text-secondary)]">
-              Recommended workflow for CI/CD pipelines:
+              Recommended workflows for CI/CD:
             </p>
+            <p className="text-[var(--color-text)] font-medium mt-6">Deployment risk (before merge/deploy)</p>
+            <CodeBlock language="yaml">{`# Run before merging PR
+- run: envguard collect --env=pr-branch
+- run: envguard analyze --against=prod --env=pr-branch --api-key=\${{ secrets.PARITYCHECK_API_KEY }} -f --risk-threshold=50`}</CodeBlock>
+            <p className="text-[var(--color-text)] font-medium mt-6">Scheduled drift monitoring</p>
             <CodeBlock language="yaml">{`# .github/workflows/parity-check.yml
 name: Parity Check
 on:
@@ -185,7 +260,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install envguard
-      - run: envguard collect --env=prod
+      - run: envguard collect --env=prod --docker  # add --docker for container drift
       - run: envguard report --api-key=\${{ secrets.PARITYCHECK_API_KEY }} --env=prod`}</CodeBlock>
           </DocSection>
         </div>

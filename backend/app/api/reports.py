@@ -3,6 +3,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -64,6 +65,8 @@ async def create_report(
         "transitive_dependencies": payload.transitive_dependencies,
         "env_vars": payload.env_vars or {},
         "db_schema_hash": payload.db_schema_hash,
+        "docker": payload.docker,
+        "k8s": payload.k8s,
     }
 
     report, _ = await process_report_upload(
@@ -111,6 +114,149 @@ async def get_baseline_report(
         "transitive_dependencies": deps.get("transitive_dependencies"),
         "env_vars": report.env_vars or {},
         "db_schema_hash": report.db_schema_hash,
+        "docker": report.docker,
+    }
+
+
+class AnalyzeRequest(BaseModel):
+    report_id: str
+    against: str = "prod"
+
+
+@router.post("/analyze")
+async def analyze_deployment_risk(
+    payload: AnalyzeRequest,
+    auth: tuple[str, UUID | None] = Depends(get_current_user_and_workspace),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Compare a report against a target env (e.g. prod). Returns deployment risk analysis."""
+    from app.services.drift_engine import compare_reports
+    from app.services.report_flow import _report_to_dict
+    from app.services.workspace import get_or_create_default_workspace
+    from sqlalchemy.orm import selectinload
+
+    user_id, workspace_id = auth
+    ws_id = workspace_id
+    if not ws_id:
+        ws = await get_or_create_default_workspace(db, UUID(user_id))
+        ws_id = ws.id
+
+    # Get the report to analyze
+    from sqlalchemy import or_
+
+    user_uuid = UUID(user_id)
+    r = await db.execute(
+        select(Report)
+        .join(Environment, Report.env_id == Environment.id)
+        .options(selectinload(Report.environment))
+        .where(
+            Report.id == UUID(payload.report_id),
+            or_(
+                Environment.user_id == user_uuid,
+                Environment.workspace_id.in_(
+                    select(WorkspaceMember.workspace_id).where(
+                        WorkspaceMember.user_id == user_uuid
+                    )
+                ),
+            ),
+        )
+    )
+    report = r.scalar_one_or_none()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    # Get latest report for target env (same workspace)
+    target = await db.execute(
+        select(Report)
+        .join(Environment, Report.env_id == Environment.id)
+        .options(selectinload(Report.environment))
+        .where(
+            Environment.workspace_id == ws_id,
+            Environment.name == payload.against,
+        )
+        .order_by(Report.timestamp.desc())
+        .limit(1)
+    )
+    target_report = target.scalar_one_or_none()
+    if not target_report:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No report found for {payload.against}. Upload from {payload.against} first.",
+        )
+
+    result = compare_reports(_report_to_dict(target_report), _report_to_dict(report))
+    risk_score = 100 - result.health_score
+    level = "Low" if risk_score <= 20 else "Medium" if risk_score <= 50 else "High"
+
+    return {
+        "deployment_risk_score": risk_score,
+        "health_score": result.health_score,
+        "risk_level": level,
+        "safe_to_deploy": result.health_score == 100,
+        "current_env": report.environment.name,
+        "against": payload.against,
+        "drift_count": len(result.drifts),
+        "summary": result.summary,
+        "risky_changes": [
+            {
+                "severity": d.severity,
+                "type": d.type,
+                "key": d.key,
+                "value_a": d.value_a,
+                "value_b": d.value_b,
+                "category": d.details.get("category"),
+                "reason": d.details.get("reason"),
+            }
+            for d in result.drifts
+        ],
+    }
+
+
+@router.get("/latest")
+async def get_latest_report_for_env(
+    env: str = Query(..., description="Environment name (e.g. prod, staging)"),
+    auth: tuple[str, UUID | None] = Depends(get_current_user_and_workspace),
+    db: AsyncSession = Depends(get_db),
+) -> dict | None:
+    """Get latest report for a specific environment. For deployment risk analysis."""
+    from app.services.workspace import get_or_create_default_workspace
+
+    user_id, workspace_id = auth
+    ws_id = workspace_id
+    if not ws_id:
+        ws = await get_or_create_default_workspace(db, UUID(user_id))
+        ws_id = ws.id
+    from sqlalchemy.orm import selectinload
+
+    result = await db.execute(
+        select(Report)
+        .join(Environment, Report.env_id == Environment.id)
+        .options(selectinload(Report.environment))
+        .where(
+            Environment.workspace_id == ws_id,
+            Environment.name == env,
+        )
+        .order_by(Report.timestamp.desc())
+        .limit(1)
+    )
+    report = result.scalar_one_or_none()
+    if not report:
+        return None
+    deps = report.deps or {}
+    return {
+        "id": str(report.id),
+        "env": report.environment.name,
+        "timestamp": iso_utc(report.timestamp),
+        "os": report.os,
+        "python_version": report.python_version,
+        "deps": deps.get("installed_dependencies") or deps.get("deps") or deps,
+        "direct_dependencies": deps.get("direct_dependencies"),
+        "installed_dependencies": deps.get("installed_dependencies"),
+        "transitive_dependencies": deps.get("transitive_dependencies"),
+        "env_vars": report.env_vars or {},
+        "db_schema_hash": report.db_schema_hash,
+        "docker": report.docker,
+        "k8s": report.k8s,
     }
 
 
@@ -239,6 +385,8 @@ async def get_report(
         "deps": report.deps,
         "env_vars": report.env_vars,
         "db_schema_hash": report.db_schema_hash,
+        "docker": report.docker,
+        "k8s": report.k8s,
         "drifts": [
             {
                 "id": str(d.id),

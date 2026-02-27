@@ -3,6 +3,7 @@ import { Routes, Route, useNavigate, useSearchParams, useLocation, Outlet } from
 import { EnvironmentStatus } from './components/EnvironmentStatus'
 import { DriftTable } from './components/DriftTable'
 import { ReportHistory } from './components/ReportHistory'
+import { AnalyzeView } from './components/AnalyzeView'
 import { Header } from './components/Header'
 import { Footer } from './components/Footer'
 import { ProfileContent } from './components/ProfileContent'
@@ -24,7 +25,7 @@ function App() {
   const [searchParams] = useSearchParams()
   const location = useLocation()
   const { user, loading, login, register, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<'overview' | 'drifts' | 'history'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'analyze' | 'drifts' | 'history'>('overview')
 
   const token = searchParams.get('token')
 
@@ -140,8 +141,8 @@ function DashboardContent({
   activeTab,
   setActiveTab,
 }: {
-  activeTab: 'overview' | 'drifts' | 'history'
-  setActiveTab: (t: 'overview' | 'drifts' | 'history') => void
+  activeTab: 'overview' | 'analyze' | 'drifts' | 'history'
+  setActiveTab: (t: 'overview' | 'analyze' | 'drifts' | 'history') => void
 }) {
   const { workspaces, currentWorkspace, usage, setCurrentWorkspaceId, refresh } = useWorkspace()
 
@@ -180,7 +181,7 @@ function DashboardContent({
       </div>
 
       <nav className="flex gap-1 mb-12 p-1.5 rounded-[var(--radius-lg)] bg-[var(--color-surface)]/40 w-fit border border-[var(--color-border)]/50">
-        {(['overview', 'drifts', 'history'] as const).map((tab) => (
+        {(['overview', 'analyze', 'drifts', 'history'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -201,6 +202,15 @@ function DashboardContent({
             Environment Parity Status
           </h2>
           <EnvironmentStatus onBaselineSet={refresh} />
+        </section>
+      )}
+
+      {activeTab === 'analyze' && (
+        <section>
+          <h2 className="text-lg font-semibold text-[var(--color-text)] mb-6">
+            Deployment Risk Analysis
+          </h2>
+          <AnalyzeView />
         </section>
       )}
 

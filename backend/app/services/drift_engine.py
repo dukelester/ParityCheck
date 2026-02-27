@@ -176,6 +176,100 @@ def _compare_structured_dependencies(
                 _add(pkg, sev, str(va), str(vb), "transitive", "Transitive version mismatch")
 
 
+def _compare_k8s(
+    k8s_a: dict,
+    k8s_b: dict,
+    result: DriftResult,
+    ignore_rules: list[dict],
+) -> None:
+    """Compare K8s deployments, configmaps, secrets."""
+    def _add(t: str, sev: str, key: str, va: Any, vb: Any, reason: str) -> None:
+        if _matches_ignore("k8s", key, ignore_rules):
+            return
+        result.drifts.append(
+            DriftEntry(
+                type="k8s",
+                severity=sev,
+                key=key,
+                value_a=str(va) if va is not None else None,
+                value_b=str(vb) if vb is not None else None,
+                details={"category": "k8s", "reason": reason},
+            )
+        )
+
+    # ConfigMaps: compare by name and data_hash
+    cm_a = k8s_a.get("configmaps") or {}
+    cm_b = k8s_b.get("configmaps") or {}
+    for name in set(cm_a) | set(cm_b):
+        ha, hb = (cm_a.get(name) or {}).get("data_hash"), (cm_b.get(name) or {}).get("data_hash")
+        if ha is None:
+            _add("k8s", "high", f"configmap:{name}", None, hb, "ConfigMap added")
+        elif hb is None:
+            _add("k8s", "high", f"configmap:{name}", ha, None, "ConfigMap removed")
+        elif ha != hb:
+            _add("k8s", "high", f"configmap:{name}", ha, hb, "ConfigMap data changed")
+
+    # Secrets: compare by name and data_hash
+    sec_a = k8s_a.get("secrets") or {}
+    sec_b = k8s_b.get("secrets") or {}
+    for name in set(sec_a) | set(sec_b):
+        ha, hb = (sec_a.get(name) or {}).get("data_hash"), (sec_b.get(name) or {}).get("data_hash")
+        if ha is None:
+            _add("k8s", "critical", f"secret:{name}", None, hb, "Secret added")
+        elif hb is None:
+            _add("k8s", "critical", f"secret:{name}", ha, None, "Secret removed")
+        elif ha != hb:
+            _add("k8s", "critical", f"secret:{name}", ha, hb, "Secret data changed")
+
+    # Deployments: image, replicas, resources, env_vars
+    dep_a = k8s_a.get("deployments") or {}
+    dep_b = k8s_b.get("deployments") or {}
+    for name in set(dep_a) | set(dep_b):
+        da, db = dep_a.get(name) or {}, dep_b.get(name) or {}
+        if not da:
+            _add("k8s", "high", f"deployment:{name}", None, "present", "Deployment added")
+            continue
+        if not db:
+            _add("k8s", "high", f"deployment:{name}", "present", None, "Deployment removed")
+            continue
+
+        # Replicas
+        ra, rb = da.get("replicas"), db.get("replicas")
+        if ra is not None and rb is not None and ra != rb:
+            _add("k8s", "medium", f"deployment:{name}.replicas", ra, rb, "Replica count changed")
+
+        # Containers: image, resources, env_vars
+        ca_list = da.get("containers") or []
+        cb_list = db.get("containers") or []
+        cb_by_name = {c.get("name"): c for c in cb_list if c.get("name")}
+        for ca in ca_list:
+            cname = ca.get("name", "")
+            cb = cb_by_name.get(cname) if cname else (cb_list[0] if cb_list else {})
+            prefix = f"deployment:{name}.{cname}" if cname else f"deployment:{name}"
+
+            img_a, img_b = ca.get("image"), cb.get("image") if cb else None
+            if img_a and img_b and img_a != img_b:
+                _add("k8s", "high", f"{prefix}.image", img_a, img_b, "Image tag changed")
+
+            res_a = ca.get("resources") or {}
+            res_b = cb.get("resources") or {} if cb else {}
+            limits_a = res_a.get("limits") or {}
+            limits_b = res_b.get("limits") or {}
+            if limits_a != limits_b:
+                _add("k8s", "medium", f"{prefix}.limits", str(limits_a), str(limits_b), "Resource limits changed")
+            req_a = res_a.get("requests") or {}
+            req_b = res_b.get("requests") or {}
+            if req_a != req_b:
+                _add("k8s", "low", f"{prefix}.requests", str(req_a), str(req_b), "Resource requests changed")
+
+            ev_a = ca.get("env_vars") or {}
+            ev_b = cb.get("env_vars") or {} if cb else {}
+            for k in set(ev_a) | set(ev_b):
+                va, vb = ev_a.get(k), ev_b.get(k)
+                if va != vb:
+                    _add("k8s", "medium", f"{prefix}.env.{k}", va, vb, "Env var changed")
+
+
 def _compare_legacy_dependencies(
     report_a: dict,
     report_b: dict,
@@ -297,6 +391,64 @@ def compare_reports(
                     details={"change": "value"},
                 )
             )
+
+    # Docker
+    docker_a = report_a.get("docker") or {}
+    docker_b = report_b.get("docker") or {}
+    if docker_a or docker_b:
+        for key, label, sev in [
+            ("image_digest", "Image digest", "high"),
+            ("base_image", "Base image", "high"),
+            ("image_tag", "Image tag", "medium"),
+            ("container_os", "Container OS", "medium"),
+        ]:
+            va, vb = docker_a.get(key), docker_b.get(key)
+            if va is None and vb is None:
+                continue
+            if _matches_ignore("docker", key, ignore_rules):
+                continue
+            if va is None:
+                result.drifts.append(
+                    DriftEntry(
+                        type="docker",
+                        severity=sev,
+                        key=key,
+                        value_a=None,
+                        value_b=str(vb) if not isinstance(vb, dict) else str(vb),
+                        details={"category": "docker", "reason": f"{label} added"},
+                    )
+                )
+            elif vb is None:
+                result.drifts.append(
+                    DriftEntry(
+                        type="docker",
+                        severity=sev,
+                        key=key,
+                        value_a=str(va) if not isinstance(va, dict) else str(va),
+                        value_b=None,
+                        details={"category": "docker", "reason": f"{label} removed"},
+                    )
+                )
+            else:
+                sa = str(va) if not isinstance(va, dict) else f"{va.get('id','')} {va.get('version_id','')}".strip()
+                sb = str(vb) if not isinstance(vb, dict) else f"{vb.get('id','')} {vb.get('version_id','')}".strip()
+                if sa != sb:
+                    result.drifts.append(
+                        DriftEntry(
+                            type="docker",
+                            severity=sev,
+                            key=key,
+                            value_a=sa or str(va),
+                            value_b=sb or str(vb),
+                            details={"category": "docker", "reason": f"{label} changed"},
+                        )
+                    )
+
+    # Kubernetes
+    k8s_a = report_a.get("k8s") or {}
+    k8s_b = report_b.get("k8s") or {}
+    if k8s_a or k8s_b:
+        _compare_k8s(k8s_a, k8s_b, result, ignore_rules)
 
     # DB schema
     hash_a, hash_b = report_a.get("db_schema_hash"), report_b.get("db_schema_hash")

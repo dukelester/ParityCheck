@@ -50,6 +50,8 @@ def _report_to_dict(report: Report) -> dict:
         "transitive_dependencies": deps.get("transitive_dependencies"),
         "env_vars": report.env_vars or {},
         "db_schema_hash": report.db_schema_hash,
+        "docker": report.docker,
+        "k8s": report.k8s,
     }
 
 
@@ -122,6 +124,8 @@ async def process_report_upload(
         deps=deps,
         env_vars=report_data.get("env_vars") or {},
         db_schema_hash=report_data.get("db_schema_hash"),
+        docker=report_data.get("docker"),
+        k8s=report_data.get("k8s"),
     )
     db.add(report)
     await db.flush()

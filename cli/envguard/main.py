@@ -3,7 +3,7 @@
 import typer
 
 from envguard import __version__
-from envguard.commands import collect, compare, report, schedule, history, check
+from envguard.commands import collect, compare, report, schedule, history, check, analyze
 
 app = typer.Typer(
     name="envguard",
@@ -22,6 +22,7 @@ app.command("collect")(collect.run)
 app.command("compare")(compare.run)
 app.command("report")(report.run)
 app.command("check")(check.run)
+app.command("analyze")(analyze.run)
 app.command("schedule")(schedule.run)
 app.command("history")(history.run)
 

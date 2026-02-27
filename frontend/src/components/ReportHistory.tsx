@@ -339,6 +339,70 @@ function ReportDetailView({ report }: { report: ReportDetail }) {
         </div>
       </div>
 
+      {report.k8s && (
+        <div className="p-4 rounded-[var(--radius-lg)] bg-[var(--color-surface)]/60 space-y-3">
+          <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Kubernetes</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div>
+              <span className="text-xs text-[var(--color-text-muted)]">Namespace</span>
+              <p className="text-sm font-mono text-[var(--color-text)]">{report.k8s.namespace || '—'}</p>
+            </div>
+            <div>
+              <span className="text-xs text-[var(--color-text-muted)]">Deployments</span>
+              <p className="text-sm text-[var(--color-text)]">
+                {Object.keys(report.k8s.deployments || {}).length}
+              </p>
+            </div>
+            <div>
+              <span className="text-xs text-[var(--color-text-muted)]">ConfigMaps</span>
+              <p className="text-sm text-[var(--color-text)]">
+                {Object.keys(report.k8s.configmaps || {}).length}
+              </p>
+            </div>
+            <div>
+              <span className="text-xs text-[var(--color-text-muted)]">Secrets</span>
+              <p className="text-sm text-[var(--color-text)]">
+                {Object.keys(report.k8s.secrets || {}).length}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {report.docker && (
+        <div className="p-4 rounded-[var(--radius-lg)] bg-[var(--color-surface)]/60 space-y-3">
+          <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Docker</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div>
+              <span className="text-xs text-[var(--color-text-muted)]">Image</span>
+              <p className="text-sm font-mono text-[var(--color-text)] truncate" title={report.docker.image_tag || undefined}>
+                {report.docker.image_tag || '—'}
+              </p>
+            </div>
+            <div>
+              <span className="text-xs text-[var(--color-text-muted)]">Digest</span>
+              <p className="text-sm font-mono text-[var(--color-text)] truncate" title={report.docker.image_digest || undefined}>
+                {report.docker.image_digest || '—'}
+              </p>
+            </div>
+            <div>
+              <span className="text-xs text-[var(--color-text-muted)]">Base image</span>
+              <p className="text-sm font-mono text-[var(--color-text)] truncate" title={report.docker.base_image || undefined}>
+                {report.docker.base_image || '—'}
+              </p>
+            </div>
+            <div>
+              <span className="text-xs text-[var(--color-text-muted)]">Container OS</span>
+              <p className="text-sm text-[var(--color-text)]">
+                {report.docker.container_os
+                  ? `${report.docker.container_os.name || report.docker.container_os.id || '—'} ${report.docker.container_os.version_id || ''}`.trim()
+                  : '—'}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <button
           type="button"

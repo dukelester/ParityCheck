@@ -116,6 +116,8 @@ class Report(Base):
     env_vars: Mapped[dict] = mapped_column(JSON, default=dict)
     db_schema_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     health_score: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 0-100
+    docker: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # image_tag, digest, base, container_os
+    k8s: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # deployments, configmaps, secrets
 
     environment = relationship("Environment", back_populates="reports")
     drifts = relationship("Drift", back_populates="report")

@@ -34,6 +34,8 @@ The **envguard** CLI collects metadata from your environments and uploads it to 
 | **Dependencies** | All pip-installed packages and versions |
 | **Env vars** | Environment variables (secrets redacted by default) |
 | **DB schema** | Hash of database schema (when configured) |
+| **Docker** | Image tag, digest, base image, container OS (with `--docker`) |
+| **Kubernetes** | Deployments, ConfigMaps, Secrets (with `--k8s`) |
 
 ---
 
@@ -57,7 +59,9 @@ cd cli && pip install -e .
 |---------|-------------|
 | `collect` | Gather metadata from current environment |
 | `compare` | Compare two cached reports locally |
+| `analyze` | Deployment risk: compare PR/branch vs prod baseline |
 | `report` | Upload report to ParityCheck SaaS |
+| `check` | CI/CD: compare with baseline, optionally fail on drift |
 | `schedule` | Configure scheduled checks |
 | `history` | List cached reports |
 
@@ -65,7 +69,7 @@ cd cli && pip install -e .
 
 ### `collect`
 
-Gathers OS, runtime, dependencies, env vars, and DB schema hash. Results are cached in `~/.envguard/` for use by `compare` and `report`.
+Gathers OS, runtime, dependencies, env vars, and DB schema hash. Results are cached in `~/.envguard/` for use by `compare` and `report`. With `--docker`, also collects image tag, digest, base image, and container OS for drift detection.
 
 ```bash
 envguard collect [OPTIONS]
@@ -76,6 +80,11 @@ envguard collect [OPTIONS]
 | `--env` | `-e` | `dev` | Environment name (dev/staging/prod) |
 | `--output` | `-o` | — | Write report to file instead of cache |
 | `--include-secrets` | — | `false` | Include secret env vars (default: redacted) |
+| `--docker` | `-d` | `false` | Collect Docker metadata (image tag, digest, base, OS) |
+| `--container` | `-c` | — | Container name/ID when running on host (use with `--docker`) |
+| `--k8s` | `-k` | `false` | Collect Kubernetes metadata (deployments, configmaps, secrets) |
+| `--namespace` | `-n` | `default` | Kubernetes namespace (use with `--k8s`) |
+| `--deployment` | — | — | Specific deployment name (default: all in namespace) |
 
 **Examples:**
 
@@ -83,7 +92,21 @@ envguard collect [OPTIONS]
 envguard collect --env=dev
 envguard collect --env=staging -o report.json
 envguard collect --env=prod --include-secrets
+
+# Inside a container: collect Docker image info for drift detection
+envguard collect --env=prod --docker
+
+# On host: inspect a specific container
+envguard collect --env=prod --docker --container=my-app
+
+# Kubernetes: ConfigMaps, Secrets, Deployments (image, replicas, resources)
+envguard collect --env=prod --k8s --namespace=prod
+envguard collect --env=staging --k8s -n staging --deployment=my-app
 ```
+
+**Docker drift** — Base image changes (Alpine → Debian), Python minor version in container, and image digest drift are high-value production risks. Use `--docker` to detect them.
+
+**Kubernetes drift** — ConfigMap mismatch, Secret mismatch, replica count, resource limits, and deployment env vars. Use `--k8s --namespace=prod` to detect them. Requires `kubectl` and cluster access.
 
 ---
 
@@ -109,6 +132,43 @@ envguard compare --env=prod
 # Compare staging against prod
 envguard compare --env=staging --baseline=prod
 ```
+
+---
+
+### `analyze`
+
+Deployment risk analysis: compares your current environment (e.g. PR branch) against a target environment (e.g. prod) and outputs a deployment risk score. Use before merging or deploying to predict drift impact.
+
+```bash
+envguard analyze [OPTIONS]
+```
+
+| Option | Short | Default | Description |
+|--------|-------|---------|-------------|
+| `--against` | `-a` | `prod` | Environment to compare against (prod, staging, etc.) |
+| `--env` | `-e` | `dev` | Current environment / branch (report from collect) |
+| `--api-key` | `-k` | **Required** | API key for authentication |
+| `--api-url` | `-u` | — | API base URL |
+| `--file` | `-F` | — | Report file (default: use cached for --env) |
+| `--output` | `-o` | `text` | Output format: `text` or `json` |
+| `--fail-on-risk` | `-f` | `false` | Exit 1 if risk score >= threshold |
+| `--risk-threshold` | `-t` | `50` | Risk threshold for --fail-on-risk (0-100) |
+
+**Examples:**
+
+```bash
+# Analyze PR branch vs prod
+envguard collect --env=pr-feature-xyz
+envguard analyze --against=prod --env=pr-feature-xyz --api-key=pc_xxxxx
+
+# JSON output for CI
+envguard analyze --against=prod --api-key=pc_xxxxx -o json
+
+# Fail CI if risk >= 30
+envguard analyze --against=prod --api-key=pc_xxxxx -f --risk-threshold=30
+```
+
+**Output:** Deployment risk score (0-100), health score, risk level (Low/Medium/High), safe-to-deploy flag, and list of risky changes.
 
 ---
 
@@ -228,7 +288,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install envguard
-      - run: envguard collect --env=prod
+      - run: envguard collect --env=prod --docker  # add --docker for container drift
       - run: envguard report --api-key=${{ secrets.PARITYCHECK_API_KEY }} --env=prod
 ```
 

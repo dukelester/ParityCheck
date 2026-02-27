@@ -117,6 +117,26 @@ async def _migrate_workspaces(conn) -> None:
         result = await conn.execute(
             text("""
                 SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'reports' AND column_name = 'docker'
+            """)
+        )
+        if result.scalar() is None:
+            await conn.execute(
+                text("ALTER TABLE reports ADD COLUMN IF NOT EXISTS docker JSON")
+            )
+        result = await conn.execute(
+            text("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'reports' AND column_name = 'k8s'
+            """)
+        )
+        if result.scalar() is None:
+            await conn.execute(
+                text("ALTER TABLE reports ADD COLUMN IF NOT EXISTS k8s JSON")
+            )
+        result = await conn.execute(
+            text("""
+                SELECT column_name FROM information_schema.columns
                 WHERE table_name = 'drifts' AND column_name = 'severity'
             """)
         )

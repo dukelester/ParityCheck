@@ -23,6 +23,9 @@ envguard collect --env=prod
 # Compare dev vs prod
 envguard compare --env=prod --baseline=dev
 
+# Deployment risk analysis (PR vs prod)
+envguard analyze --against=prod --env=pr-branch --api-key=YOUR_KEY
+
 # Upload to SaaS (requires API key)
 envguard report --api-key=YOUR_API_KEY --env=dev
 ```
@@ -59,7 +62,9 @@ docker compose up -d
 |---------|-------------|
 | `collect` | Gather OS, runtime, deps, env vars, DB schema hash |
 | `compare` | Compare two cached reports locally |
+| `analyze` | Deployment risk: compare PR/branch vs prod baseline |
 | `report` | Upload report to ParityCheck SaaS |
+| `check` | CI/CD: compare with baseline, optionally fail on drift |
 | `schedule` | Configure scheduled drift checks |
 | `history` | List cached reports |
 
@@ -107,6 +112,7 @@ See [docs/AUTH.md](docs/AUTH.md) for details. For local dev, set `DEV_SKIP_EMAIL
 ## Features
 
 - **CLI**: Collect OS, runtime, deps, env vars, DB schema hash
+- **Deployment Safety**: `envguard analyze --against=prod` — predict drift impact before deploy
 - **API**: Store reports, compute drift, JWT + API key auth
 - **Dashboard**: Environment parity status, diffs, history, in-app docs
 - **Alerts**: Slack, email, webhook (Pro/Enterprise)

@@ -17,6 +17,14 @@ def test_collect_help():
     assert "Collect" in result.output
 
 
+def test_analyze_help():
+    result = runner.invoke(app, ["analyze", "--help"])
+    assert result.exit_code == 0
+    assert "analyze" in result.output
+    assert "against" in result.output
+    assert "deployment" in result.output.lower()
+
+
 def test_collect_default():
     result = runner.invoke(app, ["collect", "--env=dev"])
     assert result.exit_code == 0
