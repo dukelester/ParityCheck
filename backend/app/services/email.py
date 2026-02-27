@@ -52,20 +52,79 @@ async def send_verification_email(to: str, token: str, name: str) -> bool:
     verify_url = f"{settings.FRONTEND_URL.rstrip('/')}/verify-email?token={token}"
     subject = "Verify your ParityCheck email"
     html_body = f"""
-    <!DOCTYPE html>
-    <html>
-    <body style="font-family: system-ui, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <h2 style="color: #06b6d4;">Verify your email</h2>
-        <p>Hi {name},</p>
-        <p>Thanks for signing up for ParityCheck. Click the button below to verify your email address:</p>
-        <p style="margin: 24px 0;">
-            <a href="{verify_url}" style="background: #06b6d4; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">Verify Email</a>
-        </p>
-        <p>Or copy this link: <a href="{verify_url}">{verify_url}</a></p>
-        <p style="color: #71717a; font-size: 14px;">This link expires in 24 hours. If you didn't create an account, you can ignore this email.</p>
-        <p>— ParityCheck</p>
-    </body>
-    </html>
-    """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Verify your email</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+        <tr>
+            <td style="padding: 40px 20px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 480px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); overflow: hidden;">
+                    <!-- Header -->
+                    <tr>
+                        <td style="padding: 40px 40px 24px 40px; text-align: center; background-color: #0d1117;">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                                <tr>
+                                    <td style="padding: 12px 24px; background-color: #00d4aa; border-radius: 12px;">
+                                        <span style="font-size: 18px; font-weight: 700; color: #0d1117; letter-spacing: -0.02em;">ParityCheck</span>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin: 12px 0 0 0; font-size: 11px; font-weight: 600; color: #6b6b76; letter-spacing: 0.1em;">ENVGUARD</p>
+                        </td>
+                    </tr>
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 32px 40px 40px 40px;">
+                            <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 700; color: #0d1117; line-height: 1.3;">
+                                Verify your email
+                            </h1>
+                            <p style="margin: 0 0 24px 0; font-size: 16px; color: #6b6b76; line-height: 1.6;">
+                                Hi {name},
+                            </p>
+                            <p style="margin: 0 0 32px 0; font-size: 16px; color: #25252d; line-height: 1.6;">
+                                Thanks for signing up for ParityCheck. Click the button below to verify your email address and get started.
+                            </p>
+                            <!-- CTA Button -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center" style="padding: 0 0 24px 0;">
+                                        <a href="{verify_url}" style="display: inline-block; padding: 16px 32px; background-color: #00d4aa; color: #0d1117; font-size: 16px; font-weight: 600; text-decoration: none; border-radius: 12px;">
+                                            Verify my email
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b6b76; line-height: 1.5;">
+                                Or copy and paste this link into your browser:
+                            </p>
+                            <p style="margin: 0 0 24px 0; font-size: 13px;">
+                                <a href="{verify_url}" style="color: #00d4aa; word-break: break-all;">{verify_url}</a>
+                            </p>
+                            <p style="margin: 0; font-size: 13px; color: #6b6b76; line-height: 1.5;">
+                                This link expires in 24 hours. If you didn't create an account, you can safely ignore this email.
+                            </p>
+                        </td>
+                    </tr>
+                    <!-- Footer -->
+                    <tr>
+                        <td style="padding: 24px 40px; background-color: #f4f4f5; border-top: 1px solid #e4e4e7; border-radius: 0 0 16px 16px;">
+                            <p style="margin: 0; font-size: 12px; color: #6b6b76; text-align: center;">
+                                © ParityCheck · Environment drift detection
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+"""
     text_body = f"Hi {name},\n\nVerify your email: {verify_url}\n\nThis link expires in 24 hours.\n\nIf you didn't request this, you can ignore this email."
     await send_email(to, subject, html_body, text_body)
