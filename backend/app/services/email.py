@@ -1,5 +1,6 @@
 """Email sending service."""
 
+import html
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -190,3 +191,87 @@ async def send_password_reset_email(to: str, token: str, name: str) -> bool:
 """
     text_body = f"Hi {name},\n\nReset your password: {reset_url}\n\nThis link expires in 1 hour.\n\nIf you didn't request this, you can ignore this email."
     await send_email(to, subject, html_body, text_body)
+
+
+async def send_drift_alert_email(
+    to: str,
+    env_name: str,
+    health_score: int,
+    drifts: list[dict],
+) -> bool:
+    """Send drift alert email."""
+    from collections import Counter
+
+    by_sev = Counter(d.get("severity") for d in drifts)
+    critical = by_sev.get("critical", 0)
+    high = by_sev.get("high", 0)
+    medium = by_sev.get("medium", 0)
+    low = by_sev.get("low", 0)
+
+    drift_rows = "\n".join(
+        f"  • [{d.get('severity', '')}] {d.get('type', '')}: {d.get('key', '')} "
+        f"({d.get('value_a', '')} → {d.get('value_b', '')})"
+        for d in drifts[:20]
+    )
+    if len(drifts) > 20:
+        drift_rows += f"\n  ... and {len(drifts) - 20} more"
+
+    subject = f"ParityCheck: Drift detected in {env_name}"
+    drift_rows_escaped = html.escape(drift_rows).replace("\n", "<br>")
+    html_body = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drift Alert</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+        <tr>
+            <td style="padding: 40px 20px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 560px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); overflow: hidden;">
+                    <tr>
+                        <td style="padding: 32px 40px; background-color: #0d1117;">
+                            <span style="font-size: 18px; font-weight: 700; color: #00d4aa;">ParityCheck</span>
+                            <p style="margin: 8px 0 0 0; font-size: 24px; font-weight: 700; color: #ffffff;">Drift detected</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 32px 40px;">
+                            <p style="margin: 0 0 16px 0; font-size: 16px; color: #25252d;">
+                                Environment: <strong>{env_name}</strong>
+                            </p>
+                            <p style="margin: 0 0 24px 0; font-size: 16px; color: #25252d;">
+                                Health Score: <strong>{health_score}</strong>
+                            </p>
+                            <p style="margin: 0 0 8px 0; font-size: 14px; color: #6b6b76;">
+                                Critical: {critical} · High: {high} · Medium: {medium} · Low: {low}
+                            </p>
+                            <div style="margin-top: 24px; padding: 16px; background-color: #f4f4f5; border-radius: 12px; font-family: monospace; font-size: 13px; color: #25252d;">{drift_rows_escaped}</div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 24px 40px; background-color: #f4f4f5; border-top: 1px solid #e4e4e7;">
+                            <p style="margin: 0; font-size: 12px; color: #6b6b76; text-align: center;">© ParityCheck · Environment drift detection</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+"""
+    text_body = (
+        f"ParityCheck Drift Alert\n\n"
+        f"Environment: {env_name}\n"
+        f"Health Score: {health_score}\n"
+        f"Critical: {critical} | High: {high} | Medium: {medium} | Low: {low}\n\n"
+        f"Drifts:\n{drift_rows}"
+    )
+    try:
+        await send_email(to, subject, html_body, text_body)
+        return True
+    except Exception:
+        return False

@@ -8,6 +8,7 @@ from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBea
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.utils import iso_utc
 from app.db.session import get_db
 from app.db.models import User
 from app.schemas.auth import (
@@ -29,6 +30,7 @@ from app.services.auth import (
     create_user,
     decode_token,
     generate_password_reset_token,
+    get_user_and_workspace_by_api_key,
     get_user_by_api_key,
     get_user_by_email,
     get_user_by_id,
@@ -53,6 +55,23 @@ from app.services.github_oauth import (
 router = APIRouter()
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 bearer = HTTPBearer(auto_error=False)
+
+
+def _extract_api_key_from_request(
+    api_key: str | None,
+    credentials: HTTPAuthorizationCredentials | None,
+) -> str | None:
+    """Get API key from X-API-Key header or Authorization: Bearer/ApiKey."""
+    if api_key:
+        return api_key
+    if credentials:
+        # ApiKey scheme: Authorization: ApiKey pc_xxx
+        if credentials.scheme.lower() == "apikey":
+            return credentials.credentials
+        # Bearer with API key (CLI sends Bearer + api_key): treat as API key if it looks like one
+        if credentials.scheme.lower() == "bearer" and credentials.credentials.startswith("pc_"):
+            return credentials.credentials
+    return None
 
 
 @router.post("/register", response_model=UserResponse)
@@ -86,7 +105,7 @@ async def register(
         email=user.email,
         name=user.name,
         email_verified=user.email_verified,
-        created_at=user.created_at.isoformat(),
+        created_at=iso_utc(user.created_at),
     )
 
 
@@ -354,7 +373,7 @@ async def get_me(
         email=user.email,
         name=user.name,
         email_verified=user.email_verified,
-        created_at=user.created_at.isoformat(),
+        created_at=iso_utc(user.created_at),
     )
 
 
@@ -372,7 +391,10 @@ async def create_user_api_key(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
 
     user_id = UUID(decoded["sub"])
-    key = await create_api_key(db, user_id)
+    from app.services.workspace import get_or_create_default_workspace
+
+    ws = await get_or_create_default_workspace(db, user_id)
+    key = await create_api_key(db, user_id, ws.id)
     await db.commit()
 
     return ApiKeyResponse(api_key=key)
@@ -403,10 +425,38 @@ async def get_current_user_id(
     db: AsyncSession = Depends(get_db),
 ) -> str:
     """Validate API key or Bearer token; return user_id. For use in Depends()."""
-    user = await get_current_user(db, api_key, credentials)
+    effective_key = _extract_api_key_from_request(api_key, credentials)
+    user = await get_current_user(db, effective_key, credentials)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="API key or Bearer token required",
         )
     return str(user.id)
+
+
+async def get_current_user_and_workspace(
+    api_key: str | None = Depends(api_key_header),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+    db: AsyncSession = Depends(get_db),
+) -> tuple[str, UUID | None]:
+    """Return (user_id, workspace_id). workspace_id is None for Bearer auth."""
+    effective_key = _extract_api_key_from_request(api_key, credentials)
+    if effective_key:
+        user, ws_id = await get_user_and_workspace_by_api_key(db, effective_key)
+        if user:
+            return str(user.id), ws_id
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired API key",
+        )
+    if credentials and credentials.scheme.lower() == "bearer":
+        decoded = decode_token(credentials.credentials)
+        if decoded and decoded.get("type") == "access":
+            user = await get_user_by_id(db, UUID(decoded["sub"]))
+            if user:
+                return str(user.id), None
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="API key or Bearer token required",
+    )

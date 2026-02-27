@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://paritycheck:paritycheck@localhost:5432/paritycheck"
     REDIS_URL: str = "redis://localhost:6379/0"
     SECRET_KEY: str = "change-me-in-production"
+    ENCRYPTION_KEY: str = ""  # 32-byte base64 for Fernet; generate with Fernet.generate_key()
     CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
     API_KEY_HEADER: str = "X-API-Key"
     FRONTEND_URL: str = "http://localhost:5173"

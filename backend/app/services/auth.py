@@ -129,9 +129,26 @@ async def get_user_by_api_key(db: AsyncSession, key: str) -> User | None:
     return result.scalar_one_or_none()
 
 
-async def create_api_key(db: AsyncSession, user_id: UUID) -> str:
+async def get_user_and_workspace_by_api_key(
+    db: AsyncSession, key: str
+) -> tuple[User | None, UUID | None]:
+    """Return (user, workspace_id). workspace_id may be None for legacy keys."""
+    result = await db.execute(
+        select(User, ApiKey.workspace_id)
+        .join(ApiKey, ApiKey.user_id == User.id)
+        .where(ApiKey.key == key, (ApiKey.expires_at.is_(None)) | (ApiKey.expires_at > datetime.now(timezone.utc).replace(tzinfo=None)))
+    )
+    row = result.one_or_none()
+    if not row:
+        return None, None
+    return row[0], row[1]
+
+
+async def create_api_key(
+    db: AsyncSession, user_id: UUID, workspace_id: UUID | None = None
+) -> str:
     key = generate_api_key()
-    api_key = ApiKey(user_id=user_id, key=key)
+    api_key = ApiKey(user_id=user_id, workspace_id=workspace_id, key=key)
     db.add(api_key)
     return key
 

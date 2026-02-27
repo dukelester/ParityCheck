@@ -17,3 +17,4 @@ class ReportResponse(BaseModel):
     env: str
     timestamp: str
     status: str
+    health_score: int | None = None

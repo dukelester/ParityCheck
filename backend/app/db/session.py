@@ -76,8 +76,81 @@ async def _migrate_users_table(conn) -> None:
         logger.warning("Migration skipped (may not be PostgreSQL or table missing): %s", e)
 
 
+async def _migrate_workspaces(conn) -> None:
+    """Add workspace columns and migrate existing environments."""
+    try:
+        # Add workspace_id, user_id, is_baseline to environments
+        result = await conn.execute(
+            text("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'environments' AND column_name = 'workspace_id'
+            """)
+        )
+        if result.scalar() is None:
+            logger.info("Adding workspace_id to environments")
+            await conn.execute(
+                text("ALTER TABLE environments ADD COLUMN IF NOT EXISTS workspace_id UUID")
+            )
+            await conn.execute(
+                text("ALTER TABLE environments ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users(id)")
+            )
+            await conn.execute(
+                text("ALTER TABLE environments ADD COLUMN IF NOT EXISTS is_baseline BOOLEAN DEFAULT FALSE")
+            )
+        # Ensure user_id is nullable (workspace-owned envs have user_id=NULL)
+        try:
+            await conn.execute(
+                text("ALTER TABLE environments ALTER COLUMN user_id DROP NOT NULL")
+            )
+        except Exception:
+            pass  # Column may already be nullable
+        result = await conn.execute(
+            text("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'reports' AND column_name = 'health_score'
+            """)
+        )
+        if result.scalar() is None:
+            await conn.execute(
+                text("ALTER TABLE reports ADD COLUMN IF NOT EXISTS health_score INTEGER")
+            )
+        result = await conn.execute(
+            text("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'drifts' AND column_name = 'severity'
+            """)
+        )
+        if result.scalar() is None:
+            await conn.execute(
+                text("ALTER TABLE drifts ADD COLUMN IF NOT EXISTS severity VARCHAR(20) DEFAULT 'medium'")
+            )
+            await conn.execute(
+                text("ALTER TABLE drifts ADD COLUMN IF NOT EXISTS key VARCHAR(255)")
+            )
+            await conn.execute(
+                text("ALTER TABLE drifts ADD COLUMN IF NOT EXISTS value_a TEXT")
+            )
+            await conn.execute(
+                text("ALTER TABLE drifts ADD COLUMN IF NOT EXISTS value_b TEXT")
+            )
+        result = await conn.execute(
+            text("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'api_keys' AND column_name = 'workspace_id'
+            """)
+        )
+        if result.scalar() is None:
+            await conn.execute(
+                text("ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS workspace_id UUID")
+            )
+    except Exception as e:
+        logger.warning("Workspace migration skipped: %s", e)
+
+
 async def init_db() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     async with engine.begin() as conn:
         await _migrate_users_table(conn)
+    async with engine.begin() as conn:
+        await _migrate_workspaces(conn)

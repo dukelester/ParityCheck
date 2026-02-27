@@ -6,82 +6,99 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import get_current_user_id
-from app.db.models import Environment, Report
+from app.api.auth import get_current_user_and_workspace, get_current_user_id
+from app.core.utils import iso_utc
+from app.db.models import Environment, Report, WorkspaceMember
 from app.db.session import get_db
 from app.schemas.report import ReportCreate, ReportResponse
+from app.services.report_flow import process_report_upload
 
 router = APIRouter()
 
 
-def _env_type_from_name(name: str) -> str:
-    """Map env name to type (dev/staging/prod)."""
-    n = name.lower()
-    if n in ("dev", "development"):
-        return "dev"
-    if n in ("staging", "stage"):
-        return "staging"
-    if n in ("prod", "production"):
-        return "prod"
-    return "dev"
+def _format_os_summary(os_data: dict | None) -> str | None:
+    """Format OS for summary, avoiding redundant 'Windows Windows' etc."""
+    if not os_data:
+        return None
+    system = str(os_data.get("system", "")).strip()
+    release = str(os_data.get("release", "")).strip()
+    machine = str(os_data.get("machine", "")).strip()
+    if not system and not release and not machine:
+        return None
+    if release and system and release.lower().startswith(system.lower()):
+        parts = [release, machine]
+    else:
+        parts = [system, release, machine]
+    return " ".join(p for p in parts if p).strip() or None
 
 
 @router.post("/", response_model=ReportResponse)
 async def create_report(
     payload: ReportCreate,
-    user_id: str = Depends(get_current_user_id),
+    auth: tuple[str, UUID | None] = Depends(get_current_user_and_workspace),
     db: AsyncSession = Depends(get_db),
 ) -> ReportResponse:
-    """Receive report from CLI. Store in DB and compute drift."""
+    """Receive report from CLI. Store in DB, compute drift, trigger alerts."""
+    user_id, workspace_id = auth
     user_uuid = UUID(user_id)
 
-    # Get or create environment
-    result = await db.execute(
-        select(Environment).where(
-            Environment.user_id == user_uuid,
-            Environment.name == payload.env,
-        )
-    )
-    env = result.scalar_one_or_none()
-    if not env:
-        env = Environment(
-            user_id=user_uuid,
-            name=payload.env,
-            type=_env_type_from_name(payload.env),
-        )
-        db.add(env)
-        await db.flush()
+    report_data = {
+        "os": payload.os,
+        "runtime": payload.runtime,
+        "deps": payload.deps or {},
+        "env_vars": payload.env_vars or {},
+        "db_schema_hash": payload.db_schema_hash,
+    }
 
-    python_version = None
-    if payload.runtime and isinstance(payload.runtime, dict):
-        python_version = (
-            payload.runtime.get("python_version") or payload.runtime.get("python")
-        )
-
-    report = Report(
-        env_id=env.id,
-        os=payload.os,
-        python_version=python_version,
-        deps=payload.deps or {},
-        env_vars=payload.env_vars or {},
-        db_schema_hash=payload.db_schema_hash,
+    report, _ = await process_report_upload(
+        db, user_uuid, workspace_id, payload.env, report_data
     )
-    db.add(report)
-    await db.flush()
-    await db.refresh(report)
 
     return ReportResponse(
         id=str(report.id),
         env=payload.env,
-        timestamp=report.timestamp.isoformat(),
+        timestamp=iso_utc(report.timestamp),
         status="stored",
+        health_score=report.health_score,
     )
+
+
+@router.get("/baseline")
+async def get_baseline_report(
+    auth: tuple[str, UUID | None] = Depends(get_current_user_and_workspace),
+    db: AsyncSession = Depends(get_db),
+) -> dict | None:
+    """Get latest baseline report. Uses workspace from API key when present, else default."""
+    from app.services.workspace import (
+        get_latest_baseline_report,
+        get_or_create_default_workspace,
+    )
+
+    user_id, workspace_id = auth
+    ws_id = workspace_id
+    if not ws_id:
+        ws = await get_or_create_default_workspace(db, UUID(user_id))
+        ws_id = ws.id
+    report = await get_latest_baseline_report(db, ws_id)
+    if not report:
+        return None
+    return {
+        "id": str(report.id),
+        "env": report.environment.name,
+        "timestamp": iso_utc(report.timestamp),
+        "os": report.os,
+        "python_version": report.python_version,
+        "deps": report.deps or {},
+        "env_vars": report.env_vars or {},
+        "db_schema_hash": report.db_schema_hash,
+    }
 
 
 @router.get("/")
 async def list_reports(
     user_id: str = Depends(get_current_user_id),
     db: AsyncSession = Depends(get_db),
+    workspace_id: str | None = Query(None, description="Filter by workspace"),
     env: str | None = Query(None, description="Filter by environment name"),
     limit: int = Query(50, ge=1, le=100),
 ) -> list[dict]:
@@ -89,14 +106,27 @@ async def list_reports(
     from sqlalchemy.orm import selectinload
 
     user_uuid = UUID(user_id)
+    from sqlalchemy import or_
+
     q = (
         select(Report)
         .join(Environment, Report.env_id == Environment.id)
-        .where(Environment.user_id == user_uuid)
         .options(selectinload(Report.environment))
+        .where(
+            or_(
+                Environment.user_id == user_uuid,
+                Environment.workspace_id.in_(
+                    select(WorkspaceMember.workspace_id).where(
+                        WorkspaceMember.user_id == user_uuid
+                    )
+                ),
+            )
+        )
         .order_by(Report.timestamp.desc())
         .limit(limit)
     )
+    if workspace_id:
+        q = q.where(Environment.workspace_id == UUID(workspace_id))
     if env:
         q = q.where(Environment.name == env)
     result = await db.execute(q)
@@ -105,13 +135,11 @@ async def list_reports(
         {
             "id": str(r.id),
             "env": r.environment.name,
-            "timestamp": r.timestamp.isoformat(),
+            "timestamp": iso_utc(r.timestamp),
             "status": "stored",
+            "health_score": r.health_score,
             "summary": {
-                "os": (
-                    f"{r.os.get('system', '')} {r.os.get('release', '')}".strip()
-                    if r.os else None
-                ),
+                "os": _format_os_summary(r.os),
                 "python_version": r.python_version,
                 "deps_count": len(r.deps) if r.deps else 0,
                 "env_vars_count": len(r.env_vars) if r.env_vars else 0,
@@ -131,12 +159,24 @@ async def get_report(
     """Get report by ID."""
     from sqlalchemy.orm import selectinload
 
+    from sqlalchemy import or_
+
     user_uuid = UUID(user_id)
     result = await db.execute(
         select(Report)
         .join(Environment, Report.env_id == Environment.id)
-        .where(Report.id == UUID(report_id), Environment.user_id == user_uuid)
         .options(selectinload(Report.environment))
+        .where(
+            Report.id == UUID(report_id),
+            or_(
+                Environment.user_id == user_uuid,
+                Environment.workspace_id.in_(
+                    select(WorkspaceMember.workspace_id).where(
+                        WorkspaceMember.user_id == user_uuid
+                    )
+                ),
+            ),
+        )
     )
     report = result.scalar_one_or_none()
     if not report:
@@ -144,7 +184,8 @@ async def get_report(
     return {
         "id": str(report.id),
         "env": report.environment.name,
-        "timestamp": report.timestamp.isoformat(),
+        "timestamp": iso_utc(report.timestamp),
+        "health_score": report.health_score,
         "os": report.os,
         "python_version": report.python_version,
         "deps": report.deps,
