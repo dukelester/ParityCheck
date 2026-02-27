@@ -114,6 +114,7 @@ class Report(Base):
     python_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
     deps: Mapped[dict] = mapped_column(JSON, default=dict)
     env_vars: Mapped[dict] = mapped_column(JSON, default=dict)
+    env_var_hashes: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     db_schema_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     health_score: Mapped[int | None] = mapped_column(Integer, nullable=True)  # 0-100
     docker: Mapped[dict | None] = mapped_column(JSON, nullable=True)  # image_tag, digest, base, container_os

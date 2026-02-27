@@ -105,6 +105,12 @@ export function DriftTable() {
                   {d.details?.category === 'transitive' && (
                     <span className="mr-1.5 px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-500/20 text-yellow-500">Transitive</span>
                   )}
+                  {d.type === 'secret_drift' && (
+                    <span className="mr-1.5 px-1.5 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-400">Secret</span>
+                  )}
+                  {d.type === 'config' && (
+                    <span className="mr-1.5 px-1.5 py-0.5 rounded text-xs font-medium bg-orange-500/20 text-orange-400">Config</span>
+                  )}
                   {d.key && (
                     <span className="font-mono">{d.key}</span>
                   )}

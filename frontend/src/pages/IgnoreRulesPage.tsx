@@ -5,6 +5,8 @@ import { ignoreRulesApi, type IgnoreRule } from '../lib/api'
 
 const RULE_TYPES = [
   { value: 'env_var', label: 'Environment variable' },
+  { value: 'config', label: 'Config / Security' },
+  { value: 'secret_drift', label: 'Secret drift' },
   { value: 'dependency', label: 'Dependency' },
   { value: 'runtime', label: 'Runtime' },
 ]

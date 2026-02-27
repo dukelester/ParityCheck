@@ -264,6 +264,16 @@ function ReportDetailView({ report }: { report: ReportDetail }) {
                   <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-semibold capitalize ${SEVERITY_COLORS[d.severity] || ''}`}>
                     {d.severity}
                   </span>
+                  {d.type === 'secret_drift' && (
+                    <span className="shrink-0 px-1.5 py-0.5 rounded text-xs font-medium bg-red-500/20 text-red-400">
+                      Secret
+                    </span>
+                  )}
+                  {d.type === 'config' && (
+                    <span className="shrink-0 px-1.5 py-0.5 rounded text-xs font-medium bg-orange-500/20 text-orange-400">
+                      Config
+                    </span>
+                  )}
                   <span className="text-[var(--color-text)]">
                     {d.type === 'dependency' ? (
                       <><span className="font-mono">{d.key}</span> {d.value_a != null && d.value_b != null && (

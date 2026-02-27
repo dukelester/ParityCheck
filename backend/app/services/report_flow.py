@@ -60,9 +60,11 @@ def _report_to_dict(report: Report) -> dict:
         "installed_dependencies": deps.get("installed_dependencies"),
         "transitive_dependencies": deps.get("transitive_dependencies"),
         "env_vars": report.env_vars or {},
+        "env_var_hashes": getattr(report, "env_var_hashes", None) or {},
         "db_schema_hash": report.db_schema_hash,
         "docker": report.docker,
         "k8s": report.k8s,
+        "env": report.environment.name if report.environment else None,
     }
 
 
@@ -134,6 +136,7 @@ async def process_report_upload(
         python_version=python_version,
         deps=deps,
         env_vars=report_data.get("env_vars") or {},
+        env_var_hashes=report_data.get("env_var_hashes"),
         db_schema_hash=report_data.get("db_schema_hash"),
         docker=report_data.get("docker"),
         k8s=report_data.get("k8s"),
@@ -180,9 +183,11 @@ async def process_report_upload(
             {"type": r.type, "key_pattern": r.key_pattern}
             for r in rules_result.scalars().all()
         ]
+        current_dict = _report_to_dict(report)
+        current_dict["env"] = env_name
         drift_result = compare_reports(
             _report_to_dict(baseline_report),
-            _report_to_dict(report),
+            current_dict,
             ignore_rules=rules,
         )
         report.health_score = drift_result.health_score

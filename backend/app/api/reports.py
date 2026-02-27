@@ -64,6 +64,7 @@ async def create_report(
         "installed_dependencies": payload.installed_dependencies,
         "transitive_dependencies": payload.transitive_dependencies,
         "env_vars": payload.env_vars or {},
+        "env_var_hashes": payload.env_var_hashes,
         "db_schema_hash": payload.db_schema_hash,
         "docker": payload.docker,
         "k8s": payload.k8s,
@@ -114,8 +115,10 @@ async def get_baseline_report(
         "installed_dependencies": deps.get("installed_dependencies"),
         "transitive_dependencies": deps.get("transitive_dependencies"),
         "env_vars": report.env_vars or {},
+        "env_var_hashes": getattr(report, "env_var_hashes", None) or {},
         "db_schema_hash": report.db_schema_hash,
         "docker": report.docker,
+        "k8s": report.k8s,
     }
 
 
@@ -255,6 +258,7 @@ async def get_latest_report_for_env(
         "installed_dependencies": deps.get("installed_dependencies"),
         "transitive_dependencies": deps.get("transitive_dependencies"),
         "env_vars": report.env_vars or {},
+        "env_var_hashes": getattr(report, "env_var_hashes", None) or {},
         "db_schema_hash": report.db_schema_hash,
         "docker": report.docker,
         "k8s": report.k8s,

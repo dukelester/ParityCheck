@@ -70,6 +70,7 @@ def run(
         "installed_dependencies": baseline_data.get("installed_dependencies"),
         "transitive_dependencies": baseline_data.get("transitive_dependencies"),
         "env_vars": baseline_data.get("env_vars") or {},
+        "env_var_hashes": baseline_data.get("env_var_hashes") or {},
         "db_schema_hash": baseline_data.get("db_schema_hash"),
         "docker": baseline_data.get("docker"),
         "k8s": baseline_data.get("k8s"),

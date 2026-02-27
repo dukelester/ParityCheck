@@ -6,6 +6,15 @@ SEVERITY_WEIGHTS = {"critical": 40, "high": 20, "medium": 10, "low": 3}
 MAX_TOTAL_DEDUCTION = 90
 CRITICAL_FLOOR = 30
 SYSTEM_PACKAGES = {"pip", "setuptools", "wheel", "pkg-resources"}
+SENSITIVE_PATTERNS = {"password", "secret", "key", "token", "credential", "auth"}
+WEAK_SECRET_VALUES = {
+    "secret", "dev", "changeme", "default", "xxx", "123", "password",
+    "django-insecure-", "insecure", "test", "demo", "temp", "tmp",
+}
+
+
+def _is_sensitive_key(key: str) -> bool:
+    return any(p in key.lower() for p in SENSITIVE_PATTERNS)
 
 
 @dataclass
@@ -105,6 +114,44 @@ def _compare_structured_dependencies(
             elif str(va) != str(vb):
                 sev = _version_severity(str(va), str(vb))
                 _add(pkg, sev, str(va), str(vb), "transitive", "Transitive version")
+
+
+def _check_security_cli(report: dict, result: DriftResult) -> None:
+    """Weak config, DEBUG in prod, AWS S3 advisory."""
+    ev = report.get("env_vars") or {}
+    env_name = (report.get("env") or "").lower()
+
+    if "prod" in env_name or "production" in env_name:
+        debug_val = ev.get("DEBUG", ev.get("DJANGO_DEBUG", "")).lower()
+        if debug_val in ("true", "1", "yes"):
+            result.drifts.append(
+                DriftEntry(
+                    "config", "critical", "DEBUG", None, "True",
+                    {"category": "security", "reason": "DEBUG enabled in production"},
+                )
+            )
+
+    for key in ev:
+        if "secret" in key.lower() or key in ("SECRET_KEY", "DJANGO_SECRET_KEY"):
+            v = str(ev.get(key, "")).lower()
+            if v and "redacted" not in v:
+                for weak in WEAK_SECRET_VALUES:
+                    if weak in v or v == weak:
+                        result.drifts.append(
+                            DriftEntry(
+                                "config", "high", key, None, "***",
+                                {"category": "weak_config", "reason": "Weak secret value"},
+                            )
+                        )
+                        break
+
+    if ev.get("AWS_ACCESS_KEY_ID") or ev.get("AWS_SECRET_ACCESS_KEY"):
+        result.drifts.append(
+            DriftEntry(
+                "config", "medium", "AWS_CREDENTIALS", None, "present",
+                {"category": "security", "reason": "AWS creds - audit S3 public access"},
+            )
+        )
 
 
 def _compare_k8s_cli(k8s_a: dict, k8s_b: dict, result: DriftResult) -> None:
@@ -255,6 +302,8 @@ def compare_reports(report_a: dict, report_b: dict) -> DriftResult:
 
     ev_a = report_a.get("env_vars") or {}
     ev_b = report_b.get("env_vars") or {}
+    hash_a = report_a.get("env_var_hashes") or {}
+    hash_b = report_b.get("env_var_hashes") or {}
     for k in set(ev_a) | set(ev_b):
         va, vb = ev_a.get(k), ev_b.get(k)
         if va is None:
@@ -265,10 +314,20 @@ def compare_reports(report_a: dict, report_b: dict) -> DriftResult:
             result.drifts.append(
                 DriftEntry("environment_variable", "critical", k, str(va), None)
             )
+        elif _is_sensitive_key(k) and hash_a.get(k) and hash_b.get(k):
+            if hash_a.get(k) != hash_b.get(k):
+                result.drifts.append(
+                    DriftEntry(
+                        "secret_drift", "critical", k, "***", "***",
+                        {"change": "value", "reason": "Secret value changed"},
+                    )
+                )
         elif str(va) != str(vb):
             result.drifts.append(
                 DriftEntry("environment_variable", "medium", k, str(va), str(vb))
             )
+
+    _check_security_cli(report_b, result)
 
     # Docker
     docker_a = report_a.get("docker") or {}

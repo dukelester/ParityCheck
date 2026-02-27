@@ -232,17 +232,22 @@ def _get_dependencies(cwd: Path, mode: str) -> dict:
     return result
 
 
-def _get_env_vars(include_secrets: bool = False) -> dict:
+def _get_env_vars(include_secrets: bool = False) -> tuple[dict, dict]:
+    """Return (env_vars, env_var_hashes). Hashes allow secret drift detection without storing values."""
     import os
 
-    sensitive = {"password", "secret", "key", "token", "credential"}
+    sensitive = {"password", "secret", "key", "token", "credential", "auth"}
     result = {}
+    hashes = {}
     for k, v in os.environ.items():
-        if not include_secrets and any(s in k.lower() for s in sensitive):
+        is_sensitive = any(s in k.lower() for s in sensitive)
+        if not include_secrets and is_sensitive:
             result[k] = "***REDACTED***"
+            if v:
+                hashes[k] = hashlib.sha256(str(v).encode()).hexdigest()
         else:
             result[k] = v
-    return result
+    return result, hashes
 
 
 def _get_db_schema_hash() -> str | None:
@@ -505,9 +510,11 @@ def run(
         "direct_dependencies": deps_data.get("direct_dependencies", {}),
         "installed_dependencies": deps_data.get("installed_dependencies", {}),
         "transitive_dependencies": deps_data.get("transitive_dependencies", {}),
-        "env_vars": _get_env_vars(include_secrets=include_secrets),
+        "env_vars": (env_vars_data := _get_env_vars(include_secrets=include_secrets))[0],
         "db_schema_hash": _get_db_schema_hash(),
     }
+    if env_vars_data[1]:
+        report_data["env_var_hashes"] = env_vars_data[1]
     docker_info = _get_docker_info(docker, container)
     if docker_info:
         report_data["docker"] = docker_info

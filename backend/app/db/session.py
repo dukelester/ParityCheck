@@ -137,6 +137,16 @@ async def _migrate_workspaces(conn) -> None:
         result = await conn.execute(
             text("""
                 SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'reports' AND column_name = 'env_var_hashes'
+            """)
+        )
+        if result.scalar() is None:
+            await conn.execute(
+                text("ALTER TABLE reports ADD COLUMN IF NOT EXISTS env_var_hashes JSON")
+            )
+        result = await conn.execute(
+            text("""
+                SELECT column_name FROM information_schema.columns
                 WHERE table_name = 'drifts' AND column_name = 'severity'
             """)
         )

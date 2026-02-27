@@ -15,6 +15,11 @@ SYSTEM_PACKAGES = {"pip", "setuptools", "wheel", "pkg-resources"}
 
 SENSITIVE_PATTERNS = {"password", "secret", "key", "token", "credential", "auth"}
 
+WEAK_SECRET_VALUES = {
+    "secret", "dev", "changeme", "default", "xxx", "123", "password",
+    "django-insecure-", "insecure", "test", "demo", "temp", "tmp",
+}
+
 
 def _is_sensitive_key(key: str) -> bool:
     return any(p in key.lower() for p in SENSITIVE_PATTERNS)
@@ -83,6 +88,69 @@ class DriftResult:
             "health_score": self.health_score,
             "summary": self.summary,
         }
+
+
+def _check_security(
+    report: dict,
+    result: DriftResult,
+    ignore_rules: list[dict],
+) -> None:
+    """Weak config, DEBUG in prod, AWS S3 public bucket advisory."""
+    ev = report.get("env_vars") or {}
+    env_name = (report.get("env") or "").lower()
+
+    # DEBUG=True in prod
+    if "prod" in env_name or "production" in env_name:
+        debug_val = ev.get("DEBUG", ev.get("DJANGO_DEBUG", "")).lower()
+        if debug_val in ("true", "1", "yes"):
+            if not _matches_ignore("config", "DEBUG", ignore_rules):
+                result.drifts.append(
+                    DriftEntry(
+                        type="config",
+                        severity="critical",
+                        key="DEBUG",
+                        value_a=None,
+                        value_b="True",
+                        details={"category": "security", "reason": "DEBUG enabled in production"},
+                    )
+                )
+
+    # Weak SECRET_KEY / similar
+    for key in ev:
+        if "secret" in key.lower() or key in ("SECRET_KEY", "DJANGO_SECRET_KEY"):
+            v = str(ev.get(key, "")).lower()
+            if v and v != "***redacted***":
+                for weak in WEAK_SECRET_VALUES:
+                    if weak in v or v == weak:
+                        if not _matches_ignore("config", key, ignore_rules):
+                            result.drifts.append(
+                                DriftEntry(
+                                    type="config",
+                                    severity="high",
+                                    key=key,
+                                    value_a=None,
+                                    value_b=_mask_value(v),
+                                    details={"category": "weak_config", "reason": "Weak secret value"},
+                                )
+                            )
+                        break
+
+    # AWS creds detected -> S3 public bucket audit advisory
+    if ev.get("AWS_ACCESS_KEY_ID") or ev.get("AWS_SECRET_ACCESS_KEY"):
+        if not _matches_ignore("config", "AWS_S3_AUDIT", ignore_rules):
+            result.drifts.append(
+                DriftEntry(
+                    type="config",
+                    severity="medium",
+                    key="AWS_CREDENTIALS",
+                    value_a=None,
+                    value_b="present",
+                    details={
+                        "category": "security",
+                        "reason": "AWS credentials detected - audit S3 bucket public access",
+                    },
+                )
+            )
 
 
 def _matches_ignore(rule_type: str, key: str, ignore_rules: list[dict]) -> bool:
@@ -381,6 +449,8 @@ def compare_reports(
     # Env vars
     ev_a = report_a.get("env_vars") or {}
     ev_b = report_b.get("env_vars") or {}
+    hash_a = report_a.get("env_var_hashes") or {}
+    hash_b = report_b.get("env_var_hashes") or {}
     for k in set(ev_a) | set(ev_b):
         if _matches_ignore("env_var", k, ignore_rules):
             continue
@@ -407,6 +477,20 @@ def compare_reports(
                     details={"change": "removed"},
                 )
             )
+        elif _is_sensitive_key(k) and hash_a.get(k) and hash_b.get(k):
+            if hash_a.get(k) != hash_b.get(k) and not _matches_ignore(
+                "secret_drift", k, ignore_rules
+            ) and not _matches_ignore("env_var", k, ignore_rules):
+                result.drifts.append(
+                    DriftEntry(
+                        type="secret_drift",
+                        severity="critical",
+                        key=k,
+                        value_a="***",
+                        value_b="***",
+                        details={"change": "value", "reason": "Secret value changed"},
+                    )
+                )
         elif str(va) != str(vb):
             result.drifts.append(
                 DriftEntry(
@@ -418,6 +502,9 @@ def compare_reports(
                     details={"change": "value"},
                 )
             )
+
+    # Security checks (run on report_b / current)
+    _check_security(report_b, result, ignore_rules)
 
     # Docker
     docker_a = report_a.get("docker") or {}

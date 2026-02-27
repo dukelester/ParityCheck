@@ -37,6 +37,7 @@ The **envguard** CLI collects metadata from your environments and uploads it to 
 | **DB schema** | Hash of database schema (when configured) |
 | **Docker** | Image tag, digest, base image, container OS (with `--docker`) |
 | **Kubernetes** | Deployments, ConfigMaps, Secrets (with `--k8s`) |
+| **Security** | Secret drift (value changed), weak config, DEBUG in prod, AWS S3 audit |
 
 ### Drift Timeline & Root Cause
 

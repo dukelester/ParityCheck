@@ -61,6 +61,7 @@ export function Documentation() {
               <li><strong className="text-[var(--color-text)]">DB schema hash</strong> — Schema drift detection</li>
               <li><strong className="text-[var(--color-text)]">Docker</strong> — Image tag, digest, base image, container OS (with <code className="font-mono text-xs bg-[var(--color-bg)] px-1.5 py-0.5 rounded">--docker</code>)</li>
               <li><strong className="text-[var(--color-text)]">Kubernetes</strong> — ConfigMaps, Secrets, Deployments (image, replicas, resources, env vars) with <code className="font-mono text-xs bg-[var(--color-bg)] px-1.5 py-0.5 rounded">--k8s</code></li>
+              <li><strong className="text-[var(--color-text)]">Security</strong> — Secret drift (value changed), weak config, DEBUG in prod, AWS S3 audit advisory</li>
             </ul>
           </DocSection>
 
