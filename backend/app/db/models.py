@@ -24,6 +24,8 @@ class User(Base):
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     verification_token: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     verification_token_expires: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    password_reset_token: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
+    password_reset_token_expires: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     api_keys = relationship("ApiKey", back_populates="user")

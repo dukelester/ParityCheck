@@ -54,6 +54,24 @@ async def _migrate_users_table(conn) -> None:
         if row and row[0] == "NO":
             logger.info("Making hashed_password nullable in users table")
             await conn.execute(text("ALTER TABLE users ALTER COLUMN hashed_password DROP NOT NULL"))
+        # Password reset columns
+        result = await conn.execute(
+            text("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_name = 'users' AND column_name = 'password_reset_token'
+            """)
+        )
+        if result.scalar() is None:
+            logger.info("Adding password_reset_token columns to users table")
+            await conn.execute(
+                text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token VARCHAR(128)")
+            )
+            await conn.execute(
+                text("CREATE INDEX IF NOT EXISTS ix_users_password_reset_token ON users(password_reset_token)")
+            )
+            await conn.execute(
+                text("ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_token_expires TIMESTAMP")
+            )
     except Exception as e:
         logger.warning("Migration skipped (may not be PostgreSQL or table missing): %s", e)
 

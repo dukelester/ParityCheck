@@ -128,3 +128,65 @@ async def send_verification_email(to: str, token: str, name: str) -> bool:
 """
     text_body = f"Hi {name},\n\nVerify your email: {verify_url}\n\nThis link expires in 24 hours.\n\nIf you didn't request this, you can ignore this email."
     await send_email(to, subject, html_body, text_body)
+
+
+async def send_password_reset_email(to: str, token: str, name: str) -> bool:
+    """Send password reset link."""
+    reset_url = f"{settings.FRONTEND_URL.rstrip('/')}/reset-password?token={token}"
+    subject = "Reset your ParityCheck password"
+    html_body = f"""
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Reset your password</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f4f5;">
+        <tr>
+            <td style="padding: 40px 20px;">
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 480px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); overflow: hidden;">
+                    <tr>
+                        <td style="padding: 40px 40px 24px 40px; text-align: center; background-color: #0d1117;">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                                <tr>
+                                    <td style="padding: 12px 24px; background-color: #00d4aa; border-radius: 12px;">
+                                        <span style="font-size: 18px; font-weight: 700; color: #0d1117;">ParityCheck</span>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin: 12px 0 0 0; font-size: 11px; font-weight: 600; color: #6b6b76;">ENVGUARD</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 32px 40px 40px 40px;">
+                            <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 700; color: #0d1117;">Reset your password</h1>
+                            <p style="margin: 0 0 24px 0; font-size: 16px; color: #6b6b76;">Hi {name},</p>
+                            <p style="margin: 0 0 32px 0; font-size: 16px; color: #25252d;">We received a request to reset your password. Click the button below to choose a new one.</p>
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td align="center" style="padding: 0 0 24px 0;">
+                                        <a href="{reset_url}" style="display: inline-block; padding: 16px 32px; background-color: #00d4aa; color: #0d1117; font-size: 16px; font-weight: 600; text-decoration: none; border-radius: 12px;">Reset password</a>
+                                    </td>
+                                </tr>
+                            </table>
+                            <p style="margin: 0 0 8px 0; font-size: 13px; color: #6b6b76;">Or copy this link: <a href="{reset_url}" style="color: #00d4aa; word-break: break-all;">{reset_url}</a></p>
+                            <p style="margin: 0; font-size: 13px; color: #6b6b76;">This link expires in 1 hour. If you didn't request this, you can safely ignore this email.</p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 24px 40px; background-color: #f4f4f5; border-top: 1px solid #e4e4e7;">
+                            <p style="margin: 0; font-size: 12px; color: #6b6b76; text-align: center;">© ParityCheck · Environment drift detection</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
+"""
+    text_body = f"Hi {name},\n\nReset your password: {reset_url}\n\nThis link expires in 1 hour.\n\nIf you didn't request this, you can ignore this email."
+    await send_email(to, subject, html_body, text_body)

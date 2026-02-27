@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.db.models import ApiKey, User
-from app.services.email import send_verification_email
+from app.services.email import send_password_reset_email, send_verification_email
 
 
 def hash_password(password: str) -> str:
@@ -50,6 +50,17 @@ def generate_verification_token() -> str:
 def verification_token_expires_at() -> datetime:
     # Return naive UTC for TIMESTAMP WITHOUT TIME ZONE columns (asyncpg compatibility)
     return (datetime.now(timezone.utc) + timedelta(hours=settings.EMAIL_VERIFICATION_EXPIRE_HOURS)).replace(tzinfo=None)
+
+
+def generate_password_reset_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def password_reset_token_expires_at() -> datetime:
+    return (
+        datetime.now(timezone.utc)
+        + timedelta(hours=settings.PASSWORD_RESET_EXPIRE_HOURS)
+    ).replace(tzinfo=None)
 
 
 def generate_api_key() -> str:
@@ -123,3 +134,26 @@ async def create_api_key(db: AsyncSession, user_id: UUID) -> str:
     api_key = ApiKey(user_id=user_id, key=key)
     db.add(api_key)
     return key
+
+
+async def get_user_by_password_reset_token(
+    db: AsyncSession, token: str
+) -> User | None:
+    """Find user by valid password reset token."""
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    result = await db.execute(
+        select(User).where(
+            User.password_reset_token == token,
+            User.password_reset_token_expires > now_utc,
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+async def reset_user_password(
+    db: AsyncSession, user: User, new_password: str
+) -> None:
+    """Update user password and clear reset token."""
+    user.hashed_password = hash_password(new_password)
+    user.password_reset_token = None
+    user.password_reset_token_expires = None

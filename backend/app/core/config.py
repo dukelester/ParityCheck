@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     SMTP_FROM_EMAIL: str = "noreply@paritycheck.io"
     SMTP_FROM_NAME: str = "ParityCheck"
     EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
+    PASSWORD_RESET_EXPIRE_HOURS: int = 1
     DEV_SKIP_EMAIL: bool = False  # When True, log verification links instead of sending
 
     # GitHub OAuth

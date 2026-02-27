@@ -12,10 +12,12 @@ from app.db.session import get_db
 from app.db.models import User
 from app.schemas.auth import (
     ApiKeyResponse,
+    ForgotPasswordRequest,
     LoginRequest,
     RegisterRequest,
     RefreshTokenRequest,
     ResendVerificationRequest,
+    ResetPasswordRequest,
     TokenResponse,
     UserResponse,
     VerifyEmailRequest,
@@ -26,14 +28,18 @@ from app.services.auth import (
     create_refresh_token,
     create_user,
     decode_token,
+    generate_password_reset_token,
     get_user_by_api_key,
     get_user_by_email,
     get_user_by_id,
+    get_user_by_password_reset_token,
     hash_password,
+    password_reset_token_expires_at,
+    reset_user_password,
     verify_email_token,
     verify_password,
 )
-from app.services.email import send_verification_email
+from app.services.email import send_password_reset_email, send_verification_email
 from app.services.github_oauth import (
     exchange_code_for_token,
     fetch_github_primary_email,
@@ -166,6 +172,58 @@ async def resend_verification(
     await db.commit()
 
     return {"message": "If the email exists, a verification link was sent"}
+
+
+@router.post("/forgot-password")
+async def forgot_password(
+    payload: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Request password reset. Sends email with reset link."""
+    user = await get_user_by_email(db, payload.email)
+    if not user:
+        return {"message": "If the email exists, a reset link was sent"}
+
+    if not user.hashed_password:
+        return {"message": "If the email exists, a reset link was sent"}
+
+    user.password_reset_token = generate_password_reset_token()
+    user.password_reset_token_expires = password_reset_token_expires_at()
+    await db.flush()
+    try:
+        await send_password_reset_email(
+            user.email, user.password_reset_token, user.name
+        )
+    except Exception as e:
+        import logging
+
+        logging.getLogger(__name__).exception("Password reset email failed: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Could not send email. Check SMTP configuration.",
+        ) from e
+    await db.commit()
+
+    return {"message": "If the email exists, a reset link was sent"}
+
+
+@router.post("/reset-password")
+async def reset_password(
+    payload: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Reset password using token from email link."""
+    user = await get_user_by_password_reset_token(db, payload.token)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired reset token",
+        )
+
+    await reset_user_password(db, user, payload.new_password)
+    await db.commit()
+
+    return {"message": "Password reset successfully"}
 
 
 @router.get("/github")
