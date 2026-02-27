@@ -105,6 +105,13 @@ async def list_reports(
             "env": r.environment.name,
             "timestamp": r.timestamp.isoformat(),
             "status": "stored",
+            "summary": {
+                "os": f"{r.os.get('system', '')} {r.os.get('release', '')}".strip() if r.os else None,
+                "python_version": r.python_version,
+                "deps_count": len(r.deps) if r.deps else 0,
+                "env_vars_count": len(r.env_vars) if r.env_vars else 0,
+                "db_schema_hash": r.db_schema_hash,
+            },
         }
         for r in reports
     ]
