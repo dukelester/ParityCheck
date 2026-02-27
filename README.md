@@ -99,6 +99,7 @@ cd cli && pip install -e . && envguard --help
 
 - **Register** → Email verification required before login
 - **Login** → JWT access + refresh tokens
+- **GitHub OAuth** → Sign in or create account with GitHub (set `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`)
 - **API Keys** → Create from dashboard for CLI (`envguard report --api-key=pc_xxx`)
 
 See [docs/AUTH.md](docs/AUTH.md) for details. For local dev, set `DEV_SKIP_EMAIL=true` to log verification links.

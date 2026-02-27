@@ -35,6 +35,8 @@ services:
       DATABASE_URL: postgresql://paritycheck:paritycheck_dev@postgres:5432/paritycheck
       REDIS_URL: redis://redis:6379/0
       SECRET_KEY: dev-secret-change-in-production
+      FRONTEND_URL: http://localhost:3000
+      DEV_SKIP_EMAIL: "true"
     depends_on:
       postgres:
         condition: service_healthy

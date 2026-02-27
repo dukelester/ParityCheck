@@ -37,9 +37,14 @@ export function Header({ user, loading, onLogout }: HeaderProps) {
                 Dashboard
               </NavLink>
               {user && (
-                <NavLink to="/profile" className={navClass}>
-                  Profile
-                </NavLink>
+                <>
+                  <NavLink to="/profile" className={navClass}>
+                    Profile
+                  </NavLink>
+                  <NavLink to="/settings" className={navClass}>
+                    Settings
+                  </NavLink>
+                </>
               )}
               <NavLink to="/docs" className={navClass}>
                 Docs

@@ -29,3 +29,6 @@ def test_collect_default():
     assert "runtime" in data
     assert "deps" in data
     assert "env_vars" in data
+    assert "direct_dependencies" in data
+    assert "installed_dependencies" in data
+    assert "transitive_dependencies" in data

@@ -1,6 +1,7 @@
 """Upload report to ParityCheck SaaS API."""
 
 import json
+import os
 from pathlib import Path
 from typing import Optional
 
@@ -8,13 +9,17 @@ import httpx
 import typer
 
 
-DEFAULT_API_URL = "https://api.paritycheck.io"
+DEFAULT_API_URL = "http://localhost:8000"
 
 
 def run(
     api_key: str = typer.Option(..., "--api-key", "-k", help="API key for authentication"),
     env: str = typer.Option("dev", "--env", "-e", help="Environment name"),
-    api_url: str = typer.Option(DEFAULT_API_URL, "--api-url", "-u", help="API base URL"),
+    api_url: str = typer.Option(
+        os.environ.get("PARITYCHECK_API_URL", DEFAULT_API_URL),
+        "--api-url", "-u",
+        help="API base URL (default: localhost:8000, or PARITYCHECK_API_URL env)",
+    ),
     file: Optional[str] = typer.Option(None, "--file", "-f", help="Report file (default: use cached)"),
 ) -> None:
     """Upload report to ParityCheck SaaS."""
@@ -27,9 +32,9 @@ def run(
 
     data = json.loads(report_path.read_text())
 
-    with httpx.Client() as client:
+    with httpx.Client(timeout=60.0) as client:
         resp = client.post(
-            f"{api_url.rstrip('/')}/api/v1/reports",
+            f"{api_url.rstrip('/')}/api/v1/reports/",
             json={"env": env, **data},
             headers={"Authorization": f"Bearer {api_key}", "X-API-Key": api_key},
         )

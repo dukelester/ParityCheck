@@ -46,8 +46,11 @@ envguard compare [--env=prod] [--baseline=dev]
 Upload report to ParityCheck SaaS.
 
 ```bash
-envguard report --api-key=KEY [--env=dev] [--output=FILE]
+envguard report --api-key=KEY [--env=dev] [--api-url=URL]
 ```
+
+- **Local dev**: `envguard report -k YOUR_KEY` (defaults to http://localhost:8000)
+- **Production**: `envguard report -k YOUR_KEY -u https://api.paritycheck.io` or set `PARITYCHECK_API_URL`
 
 ### schedule
 
