@@ -377,6 +377,38 @@ async def get_me(
     )
 
 
+@router.post("/test/create-verified-user", response_model=ApiKeyResponse)
+async def create_verified_user_for_test(
+    payload: RegisterRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create verified user + default workspace + API key. Only available when TESTING=1."""
+    if not settings.TESTING:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+
+    from app.db.models import User
+    from app.services.workspace import get_or_create_default_workspace
+
+    existing = await get_user_by_email(db, payload.email)
+    if existing:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+
+    user = User(
+        email=payload.email.lower(),
+        hashed_password=hash_password(payload.password),
+        name=payload.name,
+        email_verified=True,
+        verification_token=None,
+        verification_token_expires=None,
+    )
+    db.add(user)
+    await db.flush()
+    ws = await get_or_create_default_workspace(db, user.id)
+    key = await create_api_key(db, user.id, ws.id)
+    await db.commit()
+    return ApiKeyResponse(api_key=key)
+
+
 @router.post("/api-keys", response_model=ApiKeyResponse)
 async def create_user_api_key(
     db: AsyncSession = Depends(get_db),

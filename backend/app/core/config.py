@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
     PASSWORD_RESET_EXPIRE_HOURS: int = 1
     DEV_SKIP_EMAIL: bool = False  # When True, log verification links instead of sending
+    TESTING: bool = False  # When True, enables /auth/test/create-verified-user for E2E tests
 
     # GitHub OAuth
     GITHUB_CLIENT_ID: str = ""
