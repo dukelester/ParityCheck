@@ -20,6 +20,9 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(50), default="user")
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    verification_token: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    verification_token_expires: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     api_keys = relationship("ApiKey", back_populates="user")

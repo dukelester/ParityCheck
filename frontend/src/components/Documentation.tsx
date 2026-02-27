@@ -23,18 +23,18 @@ export function Documentation() {
   }, [activeSection])
 
   return (
-    <div className="flex gap-12 max-w-7xl mx-auto px-6 py-10">
+    <div className="flex gap-16 max-w-7xl mx-auto px-6 py-12 md:py-16">
       {/* Sidebar */}
       <aside className="w-56 shrink-0 hidden lg:block">
-        <nav className="sticky top-24 space-y-1">
+        <nav className="sticky top-28 space-y-1">
           {sections.map((s) => (
             <button
               key={s.id}
               onClick={() => setActiveSection(s.id)}
-              className={`block w-full text-left px-3 py-2 rounded-[var(--radius-md)] text-sm font-medium transition-colors ${
+              className={`block w-full text-left px-4 py-2.5 rounded-[var(--radius-md)] text-sm font-medium transition-all ${
                 activeSection === s.id
-                  ? 'bg-[var(--color-surface)] text-[var(--color-accent)]'
-                  : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]/50'
+                  ? 'bg-[var(--color-surface)]/80 text-[var(--color-accent)]'
+                  : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]/40'
               }`}
             >
               {s.title}
@@ -209,9 +209,9 @@ function DocSection({
     <section
       id={id}
       ref={(el) => { innerRef.current[id] = el }}
-      className="scroll-mt-24 mb-16"
+      className="scroll-mt-28 mb-20"
     >
-      <h2 className="text-2xl font-semibold text-[var(--color-text)] mb-4 pb-2 border-b border-[var(--color-border)]">
+      <h2 className="text-2xl md:text-3xl font-bold text-[var(--color-text)] mb-6 pb-3 border-b border-[var(--color-border)]/50">
         {title}
       </h2>
       <div className="space-y-4">{children}</div>

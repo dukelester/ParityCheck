@@ -95,6 +95,14 @@ cd cli && pip install -e . && envguard --help
 
 ---
 
+## Authentication
+
+- **Register** → Email verification required before login
+- **Login** → JWT access + refresh tokens
+- **API Keys** → Create from dashboard for CLI (`envguard report --api-key=pc_xxx`)
+
+See [docs/AUTH.md](docs/AUTH.md) for details. For local dev, set `DEV_SKIP_EMAIL=true` to log verification links.
+
 ## Features
 
 - **CLI**: Collect OS, runtime, deps, env vars, DB schema hash

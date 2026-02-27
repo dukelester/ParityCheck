@@ -11,7 +11,7 @@ pip install envguard
 Or from source:
 
 ```bash
-cd cli && pip install -e .
+cd cli && pip install -e .s
 ```
 
 ## Quick Start
