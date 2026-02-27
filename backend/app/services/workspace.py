@@ -9,7 +9,7 @@ from app.db.models import Environment, Report, Workspace, WorkspaceMember
 
 # Plan limits (slack_alerts = max number of alerts, 0 = none)
 PLAN_LIMITS = {
-    "free": {"workspaces": 1, "environments": 2, "history_days": 7, "slack_alerts": 1},
+    "free": {"workspaces": 1, "environments": 2, "history_days": 7, "slack_alerts": 20},
     "pro": {"workspaces": 5, "environments": 10, "history_days": 90, "slack_alerts": 10},
     "enterprise": {"workspaces": 999, "environments": 999, "history_days": 365, "slack_alerts": 999},
 }

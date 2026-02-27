@@ -1,5 +1,6 @@
 """Report upload flow: store, compare, drift, alert."""
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
@@ -179,20 +180,24 @@ async def process_report_upload(
                 if alert.type == "slack":
                     webhook = (alert.config or {}).get("webhook_url")
                     if webhook:
-                        await send_slack_alert(
-                            webhook,
-                            env_name,
-                            drift_result.health_score,
-                            drifts_data,
+                        asyncio.create_task(
+                            send_slack_alert(
+                                webhook,
+                                env_name,
+                                drift_result.health_score,
+                                drifts_data,
+                            )
                         )
                 elif alert.type == "email":
-                    email = (alert.config or {}).get("email")
-                    if email:
-                        await send_drift_alert_email(
-                            email,
-                            env_name,
-                            drift_result.health_score,
-                            drifts_data,
+                    email_addr = (alert.config or {}).get("email")
+                    if email_addr:
+                        asyncio.create_task(
+                            send_drift_alert_email(
+                                email_addr,
+                                env_name,
+                                drift_result.health_score,
+                                drifts_data,
+                            )
                         )
     else:
         report.health_score = 100
