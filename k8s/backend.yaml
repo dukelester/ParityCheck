@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: paritycheck-backend
+  namespace: paritycheck
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: paritycheck-backend
+  template:
+    metadata:
+      labels:
+        app: paritycheck-backend
+    spec:
+      containers:
+        - name: backend
+          image: paritycheck/backend:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: paritycheck-secrets
+                  key: database-url
+            - name: REDIS_URL
+              value: redis://redis:6379/0
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: paritycheck-secrets
+                  key: secret-key
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: paritycheck-backend
+  namespace: paritycheck
+spec:
+  selector:
+    app: paritycheck-backend
+  ports:
+    - port: 8000
+      targetPort: 8000

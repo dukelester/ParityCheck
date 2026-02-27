@@ -1,0 +1,25 @@
+# CronJob for scheduled drift detection (runs daily)
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: drift-detection
+  namespace: paritycheck
+spec:
+  schedule: "0 2 * * *"  # 2 AM daily
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: drift-worker
+              image: paritycheck/backend:latest
+              command: ["celery", "-A", "app.worker", "call", "app.tasks.detect_drift"]
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: paritycheck-secrets
+                      key: database-url
+                - name: REDIS_URL
+                  value: redis://redis:6379/0
+          restartPolicy: OnFailure
