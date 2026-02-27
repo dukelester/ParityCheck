@@ -25,9 +25,23 @@ function App() {
   const [searchParams] = useSearchParams()
   const location = useLocation()
   const { user, loading, login, register, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState<'overview' | 'analyze' | 'drifts' | 'history'>('overview')
+  const tabParam = searchParams.get('tab')
+  const reportParam = searchParams.get('report')
+  const [activeTab, setActiveTab] = useState<'overview' | 'analyze' | 'drifts' | 'history'>(
+    (tabParam === 'overview' || tabParam === 'analyze' || tabParam === 'drifts' || tabParam === 'history')
+      ? tabParam
+      : 'overview'
+  )
 
   const token = searchParams.get('token')
+
+  useEffect(() => {
+    if (tabParam === 'overview' || tabParam === 'analyze' || tabParam === 'drifts' || tabParam === 'history') {
+      setActiveTab(tabParam)
+    } else if (reportParam) {
+      setActiveTab('history')
+    }
+  }, [tabParam, reportParam])
 
   useEffect(() => {
     if (loading) return
@@ -123,7 +137,13 @@ function App() {
       }>
         <Route index element={<Landing />} />
         <Route path="dashboard" element={
-          user ? <DashboardContent activeTab={activeTab} setActiveTab={setActiveTab} /> : null
+          user ? (
+            <DashboardContent
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              openReportId={reportParam}
+            />
+          ) : null
         } />
         <Route path="profile" element={
           user ? <ProfileContent user={user} /> : null
@@ -140,9 +160,11 @@ function App() {
 function DashboardContent({
   activeTab,
   setActiveTab,
+  openReportId,
 }: {
   activeTab: 'overview' | 'analyze' | 'drifts' | 'history'
   setActiveTab: (t: 'overview' | 'analyze' | 'drifts' | 'history') => void
+  openReportId: string | null
 }) {
   const { workspaces, currentWorkspace, usage, setCurrentWorkspaceId, refresh } = useWorkspace()
 
@@ -228,7 +250,7 @@ function DashboardContent({
           <h2 className="text-lg font-semibold text-[var(--color-text)] mb-6">
             Report History
           </h2>
-          <ReportHistory />
+          <ReportHistory openReportId={openReportId} />
         </section>
       )}
     </main>

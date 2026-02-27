@@ -126,9 +126,9 @@ export function DriftTable() {
                     )}
                     {d.introduced_by_report_id && (
                       <Link
-                        to="/dashboard"
+                        to={`/dashboard?tab=history&report=${d.introduced_by_report_id}`}
                         className="text-[var(--color-accent)] hover:underline"
-                        title="Report that introduced this drift"
+                        title="View report that introduced this drift"
                       >
                         Report {d.introduced_by_report_id.slice(0, 8)}…
                       </Link>

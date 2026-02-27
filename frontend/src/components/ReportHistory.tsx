@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useWorkspace } from '../contexts/WorkspaceContext'
 import { reportsApi, type ReportDetail, type ReportSummary } from '../lib/api'
 
-export function ReportHistory() {
+export function ReportHistory({ openReportId }: { openReportId?: string | null }) {
   const { token } = useAuth()
   const { currentWorkspace } = useWorkspace()
   const [reports, setReports] = useState<ReportSummary[]>([])
@@ -19,6 +19,22 @@ export function ReportHistory() {
       .catch(() => setReports([]))
       .finally(() => setLoading(false))
   }, [token, currentWorkspace?.id])
+
+  useEffect(() => {
+    if (openReportId && !loading && reports.length > 0) {
+      const match = reports.find((r) => r.id === openReportId || r.id.startsWith(openReportId))
+      if (match) {
+        setExpandedId(match.id)
+        if (!token) return
+        setDetailLoading(true)
+        setDetail(null)
+        reportsApi.get(token, match.id)
+          .then(setDetail)
+          .catch(() => setDetail(null))
+          .finally(() => setDetailLoading(false))
+      }
+    }
+  }, [openReportId, loading, reports, token])
 
   const fetchDetail = (id: string) => {
     if (expandedId === id) {
