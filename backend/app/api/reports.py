@@ -54,7 +54,9 @@ async def create_report(
 
     python_version = None
     if payload.runtime and isinstance(payload.runtime, dict):
-        python_version = payload.runtime.get("python_version") or payload.runtime.get("python")
+        python_version = (
+            payload.runtime.get("python_version") or payload.runtime.get("python")
+        )
 
     report = Report(
         env_id=env.id,
@@ -106,7 +108,10 @@ async def list_reports(
             "timestamp": r.timestamp.isoformat(),
             "status": "stored",
             "summary": {
-                "os": f"{r.os.get('system', '')} {r.os.get('release', '')}".strip() if r.os else None,
+                "os": (
+                    f"{r.os.get('system', '')} {r.os.get('release', '')}".strip()
+                    if r.os else None
+                ),
                 "python_version": r.python_version,
                 "deps_count": len(r.deps) if r.deps else 0,
                 "env_vars_count": len(r.env_vars) if r.env_vars else 0,
