@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useWorkspace } from '../contexts/WorkspaceContext'
-import { reportsApi, type ReportDetail, type ReportSummary } from '../lib/api'
+import { reportsApi, type ReportDetail, type ReportSummary, type DriftDetail } from '../lib/api'
 
 export function ReportHistory({ openReportId }: { openReportId?: string | null }) {
   const { token } = useAuth()
@@ -196,9 +196,9 @@ function ReportDetailView({ report }: { report: ReportDetail }) {
     : '—'
 
   const drifts = report.drifts || []
-  const directDrifts = drifts.filter((d) => d.type === 'dependency' && d.details?.category === 'direct')
-  const transitiveDrifts = drifts.filter((d) => d.type === 'dependency' && d.details?.category === 'transitive')
-  const otherDrifts = drifts.filter((d) => d.type !== 'dependency' || (d.details?.category !== 'direct' && d.details?.category !== 'transitive'))
+  const directDrifts = drifts.filter((d: DriftDetail) => d.type === 'dependency' && d.details?.category === 'direct')
+  const transitiveDrifts = drifts.filter((d: DriftDetail) => d.type === 'dependency' && d.details?.category === 'transitive')
+  const otherDrifts = drifts.filter((d: DriftDetail) => d.type !== 'dependency' || (d.details?.category !== 'direct' && d.details?.category !== 'transitive'))
 
   const summary = report.summary || { critical: 0, high: 0, medium: 0, low: 0 }
 
@@ -259,7 +259,7 @@ function ReportDetailView({ report }: { report: ReportDetail }) {
           <div className="space-y-3">
             <p className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider">Drifts</p>
             <div className="space-y-2">
-              {otherDrifts.map((d, i) => (
+              {otherDrifts.map((d: DriftDetail, i: number) => (
                 <div key={d.id || i} className="flex items-start gap-2 text-sm">
                   <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-semibold capitalize ${SEVERITY_COLORS[d.severity] || ''}`}>
                     {d.severity}
@@ -293,7 +293,7 @@ function ReportDetailView({ report }: { report: ReportDetail }) {
                   )}
                 </div>
               ))}
-              {directDrifts.map((d, i) => (
+              {directDrifts.map((d: DriftDetail, i: number) => (
                 <div key={d.id || `direct-${i}`} className="flex items-start gap-2 text-sm">
                   <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-semibold capitalize ${SEVERITY_COLORS[d.severity] || ''}`}>
                     {d.severity}
@@ -328,7 +328,7 @@ function ReportDetailView({ report }: { report: ReportDetail }) {
                   </button>
                   {showTransitive && (
                     <div className="mt-2 pl-4 space-y-2 border-l-2 border-[var(--color-border)]/50">
-                      {transitiveDrifts.map((d, i) => (
+                      {transitiveDrifts.map((d: DriftDetail, i: number) => (
                         <div key={d.id || `trans-${i}`} className="flex items-start gap-2 text-sm">
                           <span className={`shrink-0 px-2 py-0.5 rounded text-xs font-semibold capitalize ${SEVERITY_COLORS[d.severity] || ''}`}>
                             {d.severity}

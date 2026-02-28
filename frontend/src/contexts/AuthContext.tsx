@@ -72,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const refresh = localStorage.getItem(REFRESH_KEY)
         if (refresh) {
           authApi.refresh(refresh)
-            .then((data) => {
+            .then((data: TokenResponse) => {
               setTokens(data)
               return authApi.me(data.access_token)
             })

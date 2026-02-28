@@ -50,7 +50,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       const stored = localStorage.getItem(STORAGE_KEY)
       const defaultWs = list[0]
       const current =
-        list.find((w) => w.id === stored) || defaultWs || null
+        list.find((w: Workspace) => w.id === stored) || defaultWs || null
       setCurrentWorkspace(current)
       if (current) {
         localStorage.setItem(STORAGE_KEY, current.id)

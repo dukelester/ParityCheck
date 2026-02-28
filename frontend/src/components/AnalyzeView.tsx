@@ -39,7 +39,7 @@ export function AnalyzeView() {
         setReports(r)
         setEnvs(e)
         if (e.length > 0) {
-          setAgainst(e.find((x) => x.name === 'prod')?.name || e[0].name)
+          setAgainst(e.find((x: Environment) => x.name === 'prod')?.name || e[0].name)
         }
       })
       .catch(() => {})
@@ -210,7 +210,7 @@ export function AnalyzeView() {
                   Risky changes
                 </p>
                 <div className="space-y-2">
-                  {result.risky_changes.map((d, i) => (
+                  {result.risky_changes.map((d: AnalyzeResult['risky_changes'][number], i: number) => (
                     <div
                       key={i}
                       className="flex items-start gap-2 text-sm py-2 px-3 rounded-[var(--radius-md)] bg-[var(--color-bg)]/40"

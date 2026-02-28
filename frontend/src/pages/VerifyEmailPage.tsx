@@ -16,7 +16,7 @@ export function VerifyEmailPage({ token, onVerified }: VerifyEmailPageProps) {
         setStatus('success')
         setMessage('Email verified successfully. You can now sign in.')
       })
-      .catch((err) => {
+      .catch((err: unknown) => {
         setStatus('error')
         setMessage(err instanceof Error ? err.message : 'Verification failed')
       })
