@@ -1,6 +1,7 @@
 """End-to-end CLI tests: collect, compare, report flow."""
 
 import json
+import re
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
@@ -112,12 +113,18 @@ def test_e2e_report_upload_mock(mock_client_cls):
     assert call_args[1]["headers"]["X-API-Key"] == "pc_test123"
 
 
+def _strip_ansi(s: str) -> str:
+    """Remove ANSI escape sequences (colors) from CLI output."""
+    return re.sub(r"\x1b\[[0-9;]*m", "", s)
+
+
 def test_e2e_check_help():
     """Check command has expected options."""
     r = runner.invoke(app, ["check", "--help"])
     assert r.exit_code == 0
-    assert "api-key" in r.output
-    assert "fail-on-drift" in r.output or "fail_on_drift" in r.output
+    out = _strip_ansi(r.output)
+    assert "api-key" in out
+    assert "fail-on-drift" in out or "fail_on_drift" in out
 
 
 def test_e2e_history_lists_cached():
