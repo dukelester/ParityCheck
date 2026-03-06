@@ -9,13 +9,38 @@ app = typer.Typer(
     name="envguard",
     help="Environment drift detection - collect, compare, and report to ParityCheck SaaS",
     add_completion=False,
+    invoke_without_command=True,
 )
 
 
-@app.callback()
-def main() -> None:
+@app.callback(invoke_without_command=True)
+def main(
+    ctx: typer.Context,
+    version: bool = typer.Option(
+        False,
+        "-v",
+        "--version",
+        help="Show version and exit.",
+    ),
+    help_: bool = typer.Option(  # alias -h to help
+        False,
+        "-h",
+        "--help",
+        help="Show this message and exit.",
+        is_eager=True,
+    ),
+) -> None:
     """ENVGUARD - Detect environment drift across dev, staging, prod."""
-    pass
+    if help_:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
+    if version:
+        typer.echo(f"envguard {__version__}")
+        raise typer.Exit()
+    # When called without a subcommand, show the top-level help.
+    if not ctx.invoked_subcommand:
+        typer.echo(ctx.get_help())
+        raise typer.Exit()
 
 
 app.command("collect")(collect.run)
