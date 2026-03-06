@@ -2,7 +2,7 @@
 
 **Detect and alert on environment drift across dev, staging, prod.**
 
-A fullstack SaaS for environment parity monitoring: CLI data collection, backend API, and visual dashboard.
+A fullstack web application for environment parity monitoring: CLI data collection, backend API, alerts, and visual dashboard.
 
 ---
 
