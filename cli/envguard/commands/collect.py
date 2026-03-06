@@ -3,6 +3,7 @@
 import base64
 import hashlib
 import json
+import os
 import platform
 import re
 import subprocess
@@ -234,8 +235,6 @@ def _get_dependencies(cwd: Path, mode: str) -> dict:
 
 def _get_env_vars(include_secrets: bool = False) -> tuple[dict, dict]:
     """Return (env_vars, env_var_hashes). Hashes allow secret drift detection without storing values."""
-    import os
-
     sensitive = {"password", "secret", "key", "token", "credential", "auth"}
     result = {}
     hashes = {}
@@ -248,6 +247,58 @@ def _get_env_vars(include_secrets: bool = False) -> tuple[dict, dict]:
         else:
             result[k] = v
     return result, hashes
+
+
+def _parse_dotenv_line(line: str) -> tuple[str, str] | None:
+    """Parse a single .env line into (KEY, VALUE)."""
+    line = line.strip()
+    if not line or line.startswith("#"):
+        return None
+    if "=" not in line:
+        return None
+    key, value = line.split("=", 1)
+    key = key.strip()
+    if not key:
+        return None
+    value = value.strip()
+    # Strip surrounding quotes if present
+    if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+        value = value[1:-1]
+    return key, value
+
+
+def _load_dotenv_files(cwd: Path, override: bool = False) -> None:
+    """
+    Best-effort load of .env-style files into os.environ.
+
+    This is opt-in via --read-dotenv and is intended to capture configuration
+    drift between environments without storing secret values directly (they
+    are still processed via _get_env_vars, which redacts and hashes).
+    """
+    candidates = [
+        ".env",
+        ".env.local",
+        ".env.development",
+        ".env.production",
+        ".env.staging",
+        ".env.test",
+    ]
+    for name in candidates:
+        path = cwd / name
+        if not path.exists():
+            continue
+        try:
+            for line in path.read_text().splitlines():
+                parsed = _parse_dotenv_line(line)
+                if not parsed:
+                    continue
+                key, value = parsed
+                if not override and key in os.environ:
+                    continue
+                os.environ[key] = value
+        except OSError:
+            # Ignore unreadable files; collection should still succeed
+            continue
 
 
 def _get_db_schema_hash() -> str | None:
@@ -455,6 +506,11 @@ def run(
     env: str = typer.Option("dev", "--env", "-e", help="Environment name (dev/staging/prod)"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Write report to file"),
     include_secrets: bool = typer.Option(False, "--include-secrets", help="Include secret env vars"),
+    read_dotenv: bool = typer.Option(
+        False,
+        "--read-dotenv",
+        help="Load .env files in the current directory before capturing env vars",
+    ),
     mode: str = typer.Option(
         "runtime",
         "--mode", "-m",
@@ -499,6 +555,9 @@ def run(
 
     if mode == "runtime" and not _is_inside_venv():
         typer.echo("Warning: Not inside a virtualenv. Run from project venv for accurate deps.", err=True)
+
+    if read_dotenv:
+        _load_dotenv_files(cwd)
 
     deps_data = _get_dependencies(cwd, mode)
 
