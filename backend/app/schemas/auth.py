@@ -53,3 +53,30 @@ class RefreshTokenRequest(BaseModel):
 class ApiKeyResponse(BaseModel):
     api_key: str
     message: str = "Store this key securely. It won't be shown again."
+
+
+class UpdateProfileRequest(BaseModel):
+    """Update basic profile fields."""
+
+    name: str = Field(..., min_length=1, max_length=255)
+
+
+class ChangeEmailRequest(BaseModel):
+    """Request email change for current user."""
+
+    new_email: EmailStr
+    current_password: str = Field(..., min_length=8, max_length=128)
+
+
+class ChangePasswordRequest(BaseModel):
+    """Change password for current user."""
+
+    current_password: str = Field(..., min_length=8, max_length=128)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+
+class DeleteAccountRequest(BaseModel):
+    """Delete current user account."""
+
+    current_password: str = Field(..., min_length=8, max_length=128)
+    confirm: str = Field(..., min_length=1, description="Must be 'delete my account'")

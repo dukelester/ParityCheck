@@ -83,6 +83,34 @@ export const authApi = {
 
   createApiKey: (token: string) =>
     request<{ api_key: string }>('/auth/api-keys', { method: 'POST', token }),
+
+  updateProfile: (token: string, name: string) =>
+    request<User>('/auth/me', {
+      method: 'PUT',
+      token,
+      body: JSON.stringify({ name }),
+    }),
+
+  changeEmail: (token: string, newEmail: string, currentPassword: string) =>
+    request<{ message: string }>('/auth/change-email', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ new_email: newEmail, current_password: currentPassword }),
+    }),
+
+  changePassword: (token: string, currentPassword: string, newPassword: string) =>
+    request<{ message: string }>('/auth/change-password', {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    }),
+
+  deleteAccount: (token: string, currentPassword: string, confirm: string) =>
+    request<{ message: string }>('/auth/me', {
+      method: 'DELETE',
+      token,
+      body: JSON.stringify({ current_password: currentPassword, confirm }),
+    }),
 }
 
 export interface Environment {
@@ -100,6 +128,15 @@ export interface Workspace {
   name: string
   plan: string
   role?: string
+}
+
+export interface WorkspaceMember {
+  id: string
+  user_id: string
+  email: string
+  name: string
+  role: string
+  joined_at: string
 }
 
 export interface Drift {
@@ -212,6 +249,25 @@ export const workspacesApi = {
     request<Workspace>('/workspaces/default', { method: 'GET', token }),
   getUsage: (token: string, workspaceId: string) =>
     request<PlanUsage>(`/workspaces/${workspaceId}/usage`, { method: 'GET', token }),
+  listMembers: (token: string, workspaceId: string) =>
+    request<WorkspaceMember[]>(`/workspaces/${workspaceId}/members`, { method: 'GET', token }),
+  inviteMember: (token: string, workspaceId: string, email: string, role: 'member' | 'admin') =>
+    request<WorkspaceMember>(`/workspaces/${workspaceId}/members`, {
+      method: 'POST',
+      token,
+      body: JSON.stringify({ email, role }),
+    }),
+  updateMemberRole: (token: string, workspaceId: string, memberId: string, role: 'member' | 'admin') =>
+    request<WorkspaceMember>(`/workspaces/${workspaceId}/members/${memberId}`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ role }),
+    }),
+  removeMember: (token: string, workspaceId: string, memberId: string) =>
+    request<{ message: string }>(`/workspaces/${workspaceId}/members/${memberId}`, {
+      method: 'DELETE',
+      token,
+    }),
 }
 
 export const ignoreRulesApi = {
@@ -255,6 +311,24 @@ export const driftsApi = {
     const q = params.toString() ? `?${params}` : ''
     return request<Drift[]>(`/drifts/${q}`, { method: 'GET', token })
   },
+}
+
+export interface ObservabilityStatus {
+  status: 'ok' | 'degraded'
+  components: {
+    database: { status: 'ok' | 'error'; error?: string | null }
+    redis: { status: 'ok' | 'error'; error?: string | null }
+  }
+  rate_limits: {
+    plan: string
+    enforced: boolean
+    note: string
+  }
+}
+
+export const observabilityApi = {
+  status: (token: string) =>
+    request<ObservabilityStatus>('/observability/status', { method: 'GET', token }),
 }
 
 export interface AnalyzeResult {

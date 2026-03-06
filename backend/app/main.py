@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import reports, auth, environments, drifts, workspaces, ignore_rules, alerts
+from app.api import reports, auth, environments, drifts, workspaces, ignore_rules, alerts, observability
 from app.core.config import settings
 from app.db.session import init_db
 
@@ -46,3 +46,4 @@ app.include_router(reports.router, prefix="/api/v1/reports", tags=["reports"])
 app.include_router(drifts.router, prefix="/api/v1/drifts", tags=["drifts"])
 app.include_router(ignore_rules.router, prefix="/api/v1/ignore-rules", tags=["ignore-rules"])
 app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["alerts"])
+app.include_router(observability.router, prefix="/api/v1/observability", tags=["observability"])

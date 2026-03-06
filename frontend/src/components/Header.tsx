@@ -1,6 +1,9 @@
 import { Link, NavLink } from 'react-router-dom'
+import { useEffect, useState } from 'react'
 import { Logo } from './Logo'
 import type { User } from '../lib/api'
+import { observabilityApi, type ObservabilityStatus } from '../lib/api'
+import { useAuth } from '../contexts/AuthContext'
 
 interface HeaderProps {
   user?: User | null
@@ -9,10 +12,58 @@ interface HeaderProps {
 }
 
 export function Header({ user, loading, onLogout }: HeaderProps) {
+  const { token } = useAuth()
+  const [status, setStatus] = useState<ObservabilityStatus | null>(null)
+  const [statusError, setStatusError] = useState<string | null>(null)
+
   const navClass = ({ isActive }: { isActive: boolean }) =>
     `px-4 py-2.5 rounded-[var(--radius-md)] text-sm font-medium transition-all ${
       isActive ? 'bg-[var(--color-surface)] text-[var(--color-accent)]' : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]/50'
     }`
+
+  useEffect(() => {
+    if (!token) {
+      setStatus(null)
+      setStatusError(null)
+      return
+    }
+    let cancelled = false
+    observabilityApi
+      .status(token)
+      .then((s) => {
+        if (!cancelled) {
+          setStatus(s)
+          setStatusError(null)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setStatus(null)
+          setStatusError(err instanceof Error ? err.message : 'Status unavailable')
+        }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [token])
+
+  const pillColor =
+    status?.status === 'ok'
+      ? 'bg-[var(--color-success-muted)] text-[var(--color-success)]'
+      : status
+        ? 'bg-[var(--color-warning-muted)] text-[var(--color-warning)]'
+        : statusError
+          ? 'bg-[var(--color-error-muted)] text-[var(--color-error)]'
+          : 'bg-[var(--color-surface)]/80 text-[var(--color-text-muted)]'
+
+  const dotColor =
+    status?.status === 'ok'
+      ? 'bg-[var(--color-success)]'
+      : status
+        ? 'bg-[var(--color-warning)]'
+        : statusError
+          ? 'bg-[var(--color-error)]'
+          : 'bg-[var(--color-border)]'
 
   return (
     <header className="sticky top-0 z-50 border-b border-[var(--color-border)]/50 bg-[var(--color-bg-elevated)]/80 backdrop-blur-xl">
@@ -52,6 +103,20 @@ export function Header({ user, loading, onLogout }: HeaderProps) {
             </nav>
           </div>
           <div className="flex items-center gap-3">
+            {user && (
+              <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-full)] text-xs font-medium border border-[var(--color-border)]/60 bg-[var(--color-bg)]/70">
+                <span className={`w-2 h-2 rounded-full ${dotColor}`} />
+                <span className={`${pillColor} px-2 py-0.5 rounded-[999px] bg-transparent !px-0 !py-0 border-0`}>
+                  {status
+                    ? status.status === 'ok'
+                      ? 'Backend: healthy'
+                      : 'Backend: degraded'
+                    : statusError
+                      ? 'Backend: error'
+                      : 'Checking status…'}
+                </span>
+              </div>
+            )}
             <a
               href="https://github.com"
               target="_blank"

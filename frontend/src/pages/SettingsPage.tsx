@@ -2,9 +2,11 @@ import { useState } from 'react'
 import { IgnoreRulesPage } from './IgnoreRulesPage'
 import { AlertsPage } from './AlertsPage'
 import { useWorkspace } from '../contexts/WorkspaceContext'
+import { WorkspaceTeam } from '../components/WorkspaceTeam'
+import { SystemStatus } from '../components/SystemStatus'
 
 export function SettingsPage() {
-  const [tab, setTab] = useState<'ignore' | 'alerts'>('ignore')
+  const [tab, setTab] = useState<'ignore' | 'alerts' | 'team' | 'status'>('ignore')
   const { currentWorkspace, usage } = useWorkspace()
 
   return (
@@ -14,7 +16,7 @@ export function SettingsPage() {
           Settings
         </h1>
         <p className="text-[var(--color-text-secondary)] mt-2">
-          Manage ignore rules and alerts for {currentWorkspace?.name || 'your workspace'}.
+          Manage ignore rules, alerts, team access and system status for {currentWorkspace?.name || 'your workspace'}.
         </p>
       </div>
 
@@ -40,7 +42,7 @@ export function SettingsPage() {
         </div>
       )}
 
-      <nav className="flex gap-1 mb-8 p-1.5 rounded-[var(--radius-lg)] bg-[var(--color-surface)]/40 w-fit border border-[var(--color-border)]/50">
+      <nav className="flex flex-wrap gap-1 mb-8 p-1.5 rounded-[var(--radius-lg)] bg-[var(--color-surface)]/40 w-fit border border-[var(--color-border)]/50">
         <button
           onClick={() => setTab('ignore')}
           className={`px-6 py-3 rounded-[var(--radius-md)] text-sm font-semibold transition-all ${
@@ -61,10 +63,32 @@ export function SettingsPage() {
         >
           Alerts
         </button>
+        <button
+          onClick={() => setTab('team')}
+          className={`px-6 py-3 rounded-[var(--radius-md)] text-sm font-semibold transition-all ${
+            tab === 'team'
+              ? 'bg-[var(--color-accent)] text-[var(--color-bg)]'
+              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]/50'
+          }`}
+        >
+          Team
+        </button>
+        <button
+          onClick={() => setTab('status')}
+          className={`px-6 py-3 rounded-[var(--radius-md)] text-sm font-semibold transition-all ${
+            tab === 'status'
+              ? 'bg-[var(--color-accent)] text-[var(--color-bg)]'
+              : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-surface)]/50'
+          }`}
+        >
+          Status
+        </button>
       </nav>
 
       {tab === 'ignore' && <IgnoreRulesPage />}
       {tab === 'alerts' && <AlertsPage />}
+      {tab === 'team' && <WorkspaceTeam />}
+      {tab === 'status' && <SystemStatus />}
     </main>
   )
 }

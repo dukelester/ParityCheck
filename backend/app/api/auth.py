@@ -13,6 +13,9 @@ from app.db.session import get_db
 from app.db.models import User
 from app.schemas.auth import (
     ApiKeyResponse,
+    ChangeEmailRequest,
+    ChangePasswordRequest,
+    DeleteAccountRequest,
     ForgotPasswordRequest,
     LoginRequest,
     RegisterRequest,
@@ -20,6 +23,7 @@ from app.schemas.auth import (
     ResendVerificationRequest,
     ResetPasswordRequest,
     TokenResponse,
+    UpdateProfileRequest,
     UserResponse,
     VerifyEmailRequest,
 )
@@ -30,6 +34,7 @@ from app.services.auth import (
     create_user,
     decode_token,
     generate_password_reset_token,
+    generate_verification_token,
     get_user_and_workspace_by_api_key,
     get_user_by_api_key,
     get_user_by_email,
@@ -38,6 +43,7 @@ from app.services.auth import (
     hash_password,
     password_reset_token_expires_at,
     reset_user_password,
+    verification_token_expires_at,
     verify_email_token,
     verify_password,
 )
@@ -245,6 +251,116 @@ async def reset_password(
     return {"message": "Password reset successfully"}
 
 
+@router.put("/me", response_model=UserResponse)
+async def update_profile(
+    payload: UpdateProfileRequest,
+    db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+):
+    """Update basic profile information for current user."""
+    if not credentials:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    decoded = decode_token(credentials.credentials)
+    if not decoded or decoded.get("type") != "access":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    user_id = decoded.get("sub")
+    user = await get_user_by_id(db, UUID(user_id))
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    user.name = payload.name
+    await db.commit()
+    await db.refresh(user)
+
+    return UserResponse(
+        id=str(user.id),
+        email=user.email,
+        name=user.name,
+        email_verified=user.email_verified,
+        created_at=iso_utc(user.created_at),
+    )
+
+
+@router.post("/change-email")
+async def change_email(
+    payload: ChangeEmailRequest,
+    db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+):
+    """Change email for current user and trigger re-verification."""
+    if not credentials:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    decoded = decode_token(credentials.credentials)
+    if not decoded or decoded.get("type") != "access":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    user_id = decoded.get("sub")
+    user = await get_user_by_id(db, UUID(user_id))
+    if not user or not user.hashed_password:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if not verify_password(payload.current_password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password")
+
+    existing = await get_user_by_email(db, payload.new_email)
+    if existing and existing.id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already in use",
+        )
+
+    user.email = payload.new_email.lower()
+    user.email_verified = False
+    token = generate_verification_token()
+    user.verification_token = token
+    user.verification_token_expires = verification_token_expires_at()
+    await db.flush()
+
+    try:
+        await send_verification_email(user.email, token, user.name)
+    except Exception as e:
+        import logging
+
+        logging.getLogger(__name__).exception("Email change verification failed: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Could not send verification email. Check SMTP configuration.",
+        ) from e
+
+    await db.commit()
+    return {"message": "Email updated. Please check your inbox to verify the new address."}
+
+
+@router.post("/change-password")
+async def change_password(
+    payload: ChangePasswordRequest,
+    db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+):
+    """Change password for current user."""
+    if not credentials:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    decoded = decode_token(credentials.credentials)
+    if not decoded or decoded.get("type") != "access":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    user_id = decoded.get("sub")
+    user = await get_user_by_id(db, UUID(user_id))
+    if not user or not user.hashed_password:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if not verify_password(payload.current_password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect current password")
+
+    await reset_user_password(db, user, payload.new_password)
+    await db.commit()
+    return {"message": "Password updated successfully"}
+
+
 @router.get("/github")
 async def github_login():
     """Redirect to GitHub OAuth."""
@@ -375,6 +491,64 @@ async def get_me(
         email_verified=user.email_verified,
         created_at=iso_utc(user.created_at),
     )
+
+
+@router.delete("/me")
+async def delete_account(
+    payload: DeleteAccountRequest,
+    db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+):
+    """Delete current user account after password confirmation.
+
+    Account deletion is blocked if the user owns any workspaces; they must be
+    transferred or deleted first to avoid orphaned data.
+    """
+    if not credentials:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+
+    decoded = decode_token(credentials.credentials)
+    if not decoded or decoded.get("type") != "access":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    if payload.confirm.strip().lower() != "delete my account":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Confirmation phrase does not match",
+        )
+
+    user_id = decoded.get("sub")
+    user = await get_user_by_id(db, UUID(user_id))
+    if not user or not user.hashed_password:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if not verify_password(payload.current_password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect password")
+
+    # Ensure user does not own any workspaces
+    from sqlalchemy import select
+    from app.db.models import ApiKey, Workspace, WorkspaceMember
+
+    owned = await db.execute(
+        select(Workspace).where(Workspace.owner_id == user.id)
+    )
+    if owned.scalars().first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You must transfer or delete owned workspaces before deleting your account.",
+        )
+
+    # Delete API keys and workspace memberships, then user
+    await db.execute(
+        ApiKey.__table__.delete().where(ApiKey.user_id == user.id)
+    )
+    await db.execute(
+        WorkspaceMember.__table__.delete().where(WorkspaceMember.user_id == user.id)
+    )
+    await db.delete(user)
+    await db.commit()
+
+    return {"message": "Account deleted successfully"}
 
 
 @router.post("/test/create-verified-user", response_model=ApiKeyResponse)
