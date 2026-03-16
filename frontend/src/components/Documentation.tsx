@@ -88,7 +88,19 @@ export function Documentation() {
 pip install envguard
 
 # From source (development)
-cd cli && pip install -e .`}</CodeBlock>
+git clone https://github.com/dukelester/ParityCheck.git
+cd ParityCheck
+cd backend && pip install -r requirements.txt
+cd frontend && npm install
+cd cli && pip install -e .
+
+# Run the application
+cd backend && uvicorn app.main:app --reload
+cd frontend && npm run dev
+cd cli && pip install -e .
+envguard --help
+
+`}</CodeBlock>
           </DocSection>
 
           {/* Quick Start */}
