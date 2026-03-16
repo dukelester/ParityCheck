@@ -16,4 +16,4 @@ createRoot(document.getElementById('root')!).render(
       </AuthProvider>
     </HashRouter>
   </StrictMode>,
-);
+)
