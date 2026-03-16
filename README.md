@@ -124,7 +124,6 @@ See [docs/AUTH.md](docs/AUTH.md) for details. For local dev, set `DEV_SKIP_EMAIL
 ## Documentation
 
 - **[Full Documentation](docs/README.md)** — CLI reference, API, CI/CD, pricing
-- **[SEO Setup](docs/SEO.md)** — Meta tags, sitemap, Open Graph, search optimization
 - **In-app Docs** — Dashboard includes built-in documentation
 
 ---
